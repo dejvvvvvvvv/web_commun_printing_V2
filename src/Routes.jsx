@@ -9,6 +9,9 @@ import HostDashboard from './pages/host-dashboard';
 import ModelUpload from './pages/model-upload';
 import CustomerDashboard from './pages/customer-dashboard';
 import Register from './pages/register';
+import Eshop from './pages/eshop';
+import Orders from './pages/orders';
+import OrderDetails from './pages/orders/details';
 
 const Routes = () => {
   return (
@@ -24,6 +27,9 @@ const Routes = () => {
         <Route path="/model-upload" element={<ModelUpload />} />
         <Route path="/customer-dashboard" element={<CustomerDashboard />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/eshop" element={<Eshop />} />
+        <Route path="/orders" element={<Orders />} />
+        <Route path="/orders/:id" element={<OrderDetails />} />
         <Route path="*" element={<NotFound />} />
       </RouterRoutes>
       </ErrorBoundary>

@@ -1,214 +1,164 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { Canvas, useLoader } from '@react-three/fiber';
+import { OrbitControls, useGLTF, Bounds, Html } from '@react-three/drei';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import * as THREE from 'three';
 import Icon from '../../../components/AppIcon';
-import Button from '../../../components/ui/Button';
 
-const ModelViewer = ({ selectedFile, onClose }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('solid'); // solid, wireframe, points
-  const [showMeasurements, setShowMeasurements] = useState(false);
-  const viewerRef = useRef(null);
+const Model = ({ url, extension, onDimensionsChange }) => {
+    const modelRef = useRef();
+    
+    const modelObject = extension === 'stl' 
+        ? useLoader(STLLoader, url)
+        : useGLTF(url).scene;
 
-  // Mock 3D model data
-  const modelData = {
-    dimensions: {
-      x: 45.2,
-      y: 32.8,
-      z: 15.6
-    },
-    volume: 23.4, // cm³
-    surfaceArea: 156.7, // cm²
-    triangles: 2847,
-    vertices: 1423
-  };
+    useLayoutEffect(() => {
+        if (!modelRef.current) return;
 
-  useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
+        modelRef.current.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
 
-    return () => clearTimeout(timer);
-  }, [selectedFile]);
+        const box = new THREE.Box3().setFromObject(modelRef.current);
+        const size = box.getSize(new THREE.Vector3());
+        onDimensionsChange(size);
+    }, [modelObject, onDimensionsChange]);
 
-  const viewModes = [
-    { id: 'solid', label: 'Plný', icon: 'Box' },
-    { id: 'wireframe', label: 'Drátový', icon: 'Grid3x3' },
-    { id: 'points', label: 'Body', icon: 'Dot' }
-  ];
+    if (extension === 'stl') {
+        return (
+            <mesh ref={modelRef} castShadow receiveShadow geometry={modelObject}>
+                <meshStandardMaterial color={'#E5E7EB'} />
+            </mesh>
+        );
+    }
+    
+    return <primitive ref={modelRef} object={modelObject} />;
+};
 
-  const handleDownload = () => {
-    // Mock download functionality
-    console.log('Downloading model:', selectedFile?.name);
-  };
+const ModelViewer = ({ selectedFile }) => {
+    const [dimensions, setDimensions] = useState(null);
+    const [modelKey, setModelKey] = useState(0);
+    const [fileUrl, setFileUrl] = useState(null);
+    const [fileExtension, setFileExtension] = useState('');
+    const [error, setError] = useState(null);
 
-  const handleShare = () => {
-    // Mock share functionality
-    console.log('Sharing model:', selectedFile?.name);
-  };
+    useEffect(() => {
+        if (selectedFile && selectedFile.file) {
+            const extension = selectedFile.file.name.split('.').pop().toLowerCase();
+            
+            if (!['stl', 'gltf', 'glb'].includes(extension)) {
+                setError(`Soubory typu ".${extension}" nejsou podporovány.`);
+                setFileUrl(null);
+                setDimensions(null);
+                return;
+            }
 
-  if (!selectedFile) {
+            const url = URL.createObjectURL(selectedFile.file);
+            setFileUrl(url);
+            setFileExtension(extension);
+            setModelKey(prevKey => prevKey + 1);
+            setDimensions(null);
+            setError(null);
+
+            return () => URL.revokeObjectURL(url);
+        } else {
+            setFileUrl(null);
+            setFileExtension('');
+            setDimensions(null);
+            setError(null);
+        }
+    }, [selectedFile]);
+    
+    const handleDimensions = (size) => {
+        setTimeout(() => setDimensions(size), 0);
+    };
+
     return (
-      <div className="bg-card border border-border rounded-xl p-8 text-center">
-        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-          <Icon name="Box" size={24} className="text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold text-foreground mb-2">Žádný model vybrán</h3>
-        <p className="text-sm text-muted-foreground">
-          Nahrajte 3D model pro zobrazení náhledu
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-            <Icon name="Box" size={16} className="text-primary" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">{selectedFile?.name}</h3>
-            <p className="text-xs text-muted-foreground">
-              {(selectedFile?.size / (1024 * 1024))?.toFixed(2)} MB
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="sm" onClick={handleShare}>
-            <Icon name="Share2" size={16} />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleDownload}>
-            <Icon name="Download" size={16} />
-          </Button>
-          {onClose && (
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <Icon name="X" size={16} />
-            </Button>
-          )}
-        </div>
-      </div>
-      {/* 3D Viewer */}
-      <div className="relative">
-        <div 
-          ref={viewerRef}
-          className="w-full h-80 bg-gradient-to-br from-muted/30 to-muted/60 flex items-center justify-center relative overflow-hidden"
-        >
-          {isLoading ? (
-            <div className="flex flex-col items-center space-y-4">
-              <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-              <p className="text-sm text-muted-foreground">Načítání 3D modelu...</p>
+        <div className="bg-card border border-border rounded-xl flex flex-col">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-foreground">Náhled modelu</h3>
+                <button className="p-1 text-muted-foreground hover:text-foreground">
+                    <Icon name="Expand" size={16} />
+                </button>
             </div>
-          ) : (
-            <>
-              {/* Mock 3D Model Display */}
-              <div className="relative">
-                <div className={`w-32 h-32 transition-all duration-300 ${
-                  viewMode === 'solid' ? 'bg-primary/20 border-4 border-primary/40' :
-                  viewMode === 'wireframe'? 'border-4 border-primary bg-transparent' : 'bg-primary/10 border-2 border-dashed border-primary/60'
-                } rounded-lg transform rotate-12 hover:rotate-6 transition-transform cursor-move`}>
-                  <div className="absolute inset-2 bg-primary/10 rounded border-2 border-primary/30 transform -rotate-6" />
-                  <div className="absolute inset-4 bg-primary/5 rounded border border-primary/20 transform rotate-3" />
-                </div>
-                
-                {/* Measurements overlay */}
-                {showMeasurements && (
-                  <div className="absolute -top-8 -left-8 -right-8 -bottom-8 pointer-events-none">
-                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full">
-                      <div className="bg-foreground text-background text-xs px-2 py-1 rounded">
-                        {modelData?.dimensions?.x} mm
-                      </div>
+
+            <div className="flex-grow flex items-center justify-center p-4 min-h-[450px]">
+                {fileUrl ? (
+                    <Canvas key={modelKey} camera={{ fov: 50 }} shadows>
+                        <ambientLight intensity={0.6} />
+                        
+                        {/* Main light (Key Light) */}
+                        <directionalLight
+                            position={[10, 10, 5]}
+                            intensity={1.5}
+                            castShadow
+                            shadow-mapSize-width={2048}
+                            shadow-mapSize-height={2048}
+                            shadow-bias={-0.001}
+                        />
+
+                        {/* Fill light */}
+                        <directionalLight
+                            position={[-10, 10, -5]}
+                            intensity={0.4}
+                        />
+
+                        {/* Back light */}
+                        <directionalLight
+                            position={[0, -10, -10]}
+                            intensity={0.6}
+                        />
+                        
+                        <Suspense fallback={<Html center><p className="text-foreground">Načítání...</p></Html>}> 
+                            <Bounds fit clip observe margin={1.1}>
+                                <Model 
+                                    url={fileUrl} 
+                                    extension={fileExtension} 
+                                    onDimensionsChange={handleDimensions} 
+                                />
+                            </Bounds>
+                        </Suspense>
+                        
+                        <OrbitControls makeDefault />
+                    </Canvas>
+                ) : (
+                    <div className="text-center">
+                        {error ? (
+                             <p className="text-sm text-destructive">{error}</p>
+                        ) : (
+                            <>
+                                <Icon name="Box" size={48} className="text-muted-foreground mx-auto mb-4" />
+                                <p className="text-sm text-muted-foreground">Pro náhled nahrajte soubor</p>
+                            </>
+                        )}
                     </div>
-                    <div className="absolute left-0 top-1/2 transform -translate-x-full -translate-y-1/2 -rotate-90">
-                      <div className="bg-foreground text-background text-xs px-2 py-1 rounded">
-                        {modelData?.dimensions?.y} mm
-                      </div>
-                    </div>
-                  </div>
                 )}
-              </div>
-              
-              {/* Grid background */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="w-full h-full" style={{
-                  backgroundImage: `
-                    linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px)
-                  `,
-                  backgroundSize: '20px 20px'
-                }} />
-              </div>
-            </>
-          )}
-        </div>
+            </div>
 
-        {/* Controls Overlay */}
-        {!isLoading && (
-          <div className="absolute top-4 right-4 flex flex-col space-y-2">
-            <Button variant="secondary" size="sm" onClick={() => setShowMeasurements(!showMeasurements)}>
-              <Icon name="Ruler" size={16} />
-            </Button>
-            <Button variant="secondary" size="sm">
-              <Icon name="RotateCcw" size={16} />
-            </Button>
-            <Button variant="secondary" size="sm">
-              <Icon name="ZoomIn" size={16} />
-            </Button>
-          </div>
-        )}
-      </div>
-      {/* View Mode Controls */}
-      <div className="p-4 border-t border-border">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-medium text-foreground">Režim zobrazení</h4>
-          <div className="flex items-center space-x-1 bg-muted rounded-lg p-1">
-            {viewModes?.map((mode) => (
-              <button
-                key={mode?.id}
-                onClick={() => setViewMode(mode?.id)}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                  viewMode === mode?.id
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Icon name={mode?.icon} size={14} />
-                <span>{mode?.label}</span>
-              </button>
-            ))}
-          </div>
+            {dimensions && (
+                <div className="p-4 border-t border-border">
+                    <h4 className="text-sm font-semibold text-foreground mb-2">Přibližné rozměry modelu</h4>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-muted/50 p-2 rounded-md">
+                            <p className="text-xs text-muted-foreground">Šířka (X)</p>
+                            <p className="text-sm font-mono font-medium text-foreground">{dimensions.x.toFixed(2)} mm</p>
+                        </div>
+                        <div className="bg-muted/50 p-2 rounded-md">
+                            <p className="text-xs text-muted-foreground">Výška (Y)</p>
+                            <p className="text-sm font-mono font-medium text-foreground">{dimensions.y.toFixed(2)} mm</p>
+                        </div>
+                        <div className="bg-muted/50 p-2 rounded-md">
+                            <p className="text-xs text-muted-foreground">Hloubka (Z)</p>
+                            <p className="text-sm font-mono font-medium text-foreground">{dimensions.z.toFixed(2)} mm</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-
-        {/* Model Information */}
-        <div className="grid grid-cols-2 gap-4 text-xs">
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Rozměry:</span>
-              <span className="text-foreground font-medium">
-                {modelData?.dimensions?.x} × {modelData?.dimensions?.y} × {modelData?.dimensions?.z} mm
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Objem:</span>
-              <span className="text-foreground font-medium">{modelData?.volume} cm³</span>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Trojúhelníky:</span>
-              <span className="text-foreground font-medium">{modelData?.triangles?.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Vrcholy:</span>
-              <span className="text-foreground font-medium">{modelData?.vertices?.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default ModelViewer;

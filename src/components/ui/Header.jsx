@@ -24,6 +24,7 @@ const Header = () => {
     { label: 'Upload Model', path: '/model-upload', icon: 'Upload' },
     { label: 'Printers', path: '/printer-catalog', icon: 'Printer' },
     { label: 'Orders', path: '/orders', icon: 'Package' },
+    { label: 'Eshop', path: '/eshop', icon: 'ShoppingCart' },
   ];
 
   const hostNavItems = [
