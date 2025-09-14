@@ -83,7 +83,7 @@ const FullScreenViewer = ({ fileUrl, onClose }) => {
             <div className="relative w-[90vw] h-[90vh] bg-transparent" onClick={(e) => e.stopPropagation()}>
                 <div className="absolute top-2 right-2 z-20">
                     <Button variant="ghost" size="icon" onClick={onClose} aria-label="Zavřít celé okno">
-                        <Icon name="Minimize" size={20} />
+                        <Icon name="Minimize" size={28} />
                     </Button>
                 </div>
                 <Suspense fallback={
