@@ -1,164 +1,199 @@
-import React, { Suspense, useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { Canvas, useLoader } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Bounds, Html } from '@react-three/drei';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
-import Icon from '../../../components/AppIcon';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import Icon from 'components/AppIcon';
+import Button from 'components/ui/Button';
 
-const Model = ({ url, extension, onDimensionsChange }) => {
-    const modelRef = useRef();
-    
-    const modelObject = extension === 'stl' 
-        ? useLoader(STLLoader, url)
-        : useGLTF(url).scene;
+const ModelViewer = ({ selectedFile, onAnalysisChange }) => {
+  const mountRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [modelInfo, setModelInfo] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-    useLayoutEffect(() => {
-        if (!modelRef.current) return;
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
 
-        modelRef.current.traverse(child => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
+  useEffect(() => {
+    const currentMount = mountRef.current;
 
-        const box = new THREE.Box3().setFromObject(modelRef.current);
-        const size = box.getSize(new THREE.Vector3());
-        onDimensionsChange(size);
-    }, [modelObject, onDimensionsChange]);
-
-    if (extension === 'stl') {
-        return (
-            <mesh ref={modelRef} castShadow receiveShadow geometry={modelObject}>
-                <meshStandardMaterial color={'#E5E7EB'} />
-            </mesh>
-        );
+    if (!selectedFile || !selectedFile.file) {
+      setIsLoading(false);
+      setError(null);
+      setModelInfo(null);
+      if (onAnalysisChange) onAnalysisChange(null);
+      // The cleanup function from the previous effect will handle DOM clearing
+      return;
     }
-    
-    return <primitive ref={modelRef} object={modelObject} />;
-};
 
-const ModelViewer = ({ selectedFile }) => {
-    const [dimensions, setDimensions] = useState(null);
-    const [modelKey, setModelKey] = useState(0);
-    const [fileUrl, setFileUrl] = useState(null);
-    const [fileExtension, setFileExtension] = useState('');
-    const [error, setError] = useState(null);
+    setIsLoading(true);
+    setError(null);
+    setModelInfo(null);
 
-    useEffect(() => {
-        if (selectedFile && selectedFile.file) {
-            const extension = selectedFile.file.name.split('.').pop().toLowerCase();
-            
-            if (!['stl', 'gltf', 'glb'].includes(extension)) {
-                setError(`Soubory typu ".${extension}" nejsou podporovány.`);
-                setFileUrl(null);
-                setDimensions(null);
-                return;
+    let animationFrameId;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    scene.background = isFullscreen ? null : new THREE.Color(0xf0f0f0);
+    camera.position.z = 100;
+    renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
+    controls.enableDamping = true;
+
+    // Clear the mount point and append the new renderer
+    currentMount.innerHTML = '';
+    currentMount.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    directionalLight.position.set(50, 50, 50);
+    scene.add(directionalLight);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const fileContent = event.target.result;
+        const loader = selectedFile.name.toLowerCase().endsWith('.stl') ? new STLLoader() : new OBJLoader();
+        const geometryOrObject = loader.parse(fileContent);
+        
+        const material = new THREE.MeshStandardMaterial({ color: 0x0055ff, metalness: 0.1, roughness: 0.5 });
+        const mesh = geometryOrObject instanceof THREE.Mesh ? geometryOrObject : new THREE.Mesh(geometryOrObject, material);
+        scene.add(mesh);
+
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        mesh.position.sub(center);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        camera.position.z = Math.abs(maxDim / Math.tan(fov / 2)) * 1.2;
+        camera.lookAt(scene.position);
+        controls.update();
+
+        let volume = 0;
+        if (mesh.geometry?.isBufferGeometry) {
+          const position = mesh.geometry.attributes.position;
+          if (position) {
+            for (let i = 0; i < position.count; i += 3) {
+              const v1 = new THREE.Vector3().fromBufferAttribute(position, i);
+              const v2 = new THREE.Vector3().fromBufferAttribute(position, i + 1);
+              const v3 = new THREE.Vector3().fromBufferAttribute(position, i + 2);
+              volume += v1.clone().cross(v2).dot(v3);
             }
-
-            const url = URL.createObjectURL(selectedFile.file);
-            setFileUrl(url);
-            setFileExtension(extension);
-            setModelKey(prevKey => prevKey + 1);
-            setDimensions(null);
-            setError(null);
-
-            return () => URL.revokeObjectURL(url);
-        } else {
-            setFileUrl(null);
-            setFileExtension('');
-            setDimensions(null);
-            setError(null);
+            volume = Math.abs(volume / 6.0);
+          }
         }
-    }, [selectedFile]);
-    
-    const handleDimensions = (size) => {
-        setTimeout(() => setDimensions(size), 0);
+
+        const analysis = { dimensions: { x: size.x, y: size.y, z: size.z }, volume };
+        setModelInfo(analysis);
+        if (onAnalysisChange) onAnalysisChange(analysis);
+      } catch (e) {
+        console.error("Error processing model:", e);
+        setError("Chyba při zpracování modelu.");
+      } finally {
+        setIsLoading(false);
+      }
     };
+    reader.onerror = () => {
+      setError("Chyba při čtení souboru.");
+      setIsLoading(false);
+    };
+    reader.readAsArrayBuffer(selectedFile.file);
 
-    return (
-        <div className="bg-card border border-border rounded-xl flex flex-col">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-foreground">Náhled modelu</h3>
-                <button className="p-1 text-muted-foreground hover:text-foreground">
-                    <Icon name="Expand" size={16} />
-                </button>
-            </div>
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    };
+    animate();
 
-            <div className="flex-grow flex items-center justify-center p-4 min-h-[450px]">
-                {fileUrl ? (
-                    <Canvas key={modelKey} camera={{ fov: 50 }} shadows>
-                        <ambientLight intensity={0.6} />
-                        
-                        {/* Main light (Key Light) */}
-                        <directionalLight
-                            position={[10, 10, 5]}
-                            intensity={1.5}
-                            castShadow
-                            shadow-mapSize-width={2048}
-                            shadow-mapSize-height={2048}
-                            shadow-bias={-0.001}
-                        />
+    const handleResize = () => {
+      if (mountRef.current) {
+        const { clientWidth, clientHeight } = mountRef.current;
+        camera.aspect = clientWidth / clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(clientWidth, clientHeight);
+      }
+    };
+    window.addEventListener('resize', handleResize);
 
-                        {/* Fill light */}
-                        <directionalLight
-                            position={[-10, 10, -5]}
-                            intensity={0.4}
-                        />
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', handleResize);
+      
+      controls.dispose();
+      renderer.dispose();
+      scene.traverse(object => {
+        if (object.geometry) object.geometry.dispose();
+        if (object.material) {
+            if (Array.isArray(object.material)) {
+                object.material.forEach(material => material.dispose());
+            } else {
+                object.material.dispose();
+            }
+        }
+      });
+      
+      if (currentMount) {
+        currentMount.innerHTML = '';
+      }
+    };
+  }, [selectedFile, isFullscreen, onAnalysisChange]);
 
-                        {/* Back light */}
-                        <directionalLight
-                            position={[0, -10, -10]}
-                            intensity={0.6}
-                        />
-                        
-                        <Suspense fallback={<Html center><p className="text-foreground">Načítání...</p></Html>}> 
-                            <Bounds fit clip observe margin={1.1}>
-                                <Model 
-                                    url={fileUrl} 
-                                    extension={fileExtension} 
-                                    onDimensionsChange={handleDimensions} 
-                                />
-                            </Bounds>
-                        </Suspense>
-                        
-                        <OrbitControls makeDefault />
-                    </Canvas>
-                ) : (
-                    <div className="text-center">
-                        {error ? (
-                             <p className="text-sm text-destructive">{error}</p>
-                        ) : (
-                            <>
-                                <Icon name="Box" size={48} className="text-muted-foreground mx-auto mb-4" />
-                                <p className="text-sm text-muted-foreground">Pro náhled nahrajte soubor</p>
-                            </>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {dimensions && (
-                <div className="p-4 border-t border-border">
-                    <h4 className="text-sm font-semibold text-foreground mb-2">Přibližné rozměry modelu</h4>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-muted/50 p-2 rounded-md">
-                            <p className="text-xs text-muted-foreground">Šířka (X)</p>
-                            <p className="text-sm font-mono font-medium text-foreground">{dimensions.x.toFixed(2)} mm</p>
-                        </div>
-                        <div className="bg-muted/50 p-2 rounded-md">
-                            <p className="text-xs text-muted-foreground">Výška (Y)</p>
-                            <p className="text-sm font-mono font-medium text-foreground">{dimensions.y.toFixed(2)} mm</p>
-                        </div>
-                        <div className="bg-muted/50 p-2 rounded-md">
-                            <p className="text-xs text-muted-foreground">Hloubka (Z)</p>
-                            <p className="text-sm font-mono font-medium text-foreground">{dimensions.z.toFixed(2)} mm</p>
-                        </div>
-                    </div>
-                </div>
-            )}
+  return (
+    <div className={`flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-black/80 backdrop-blur-sm text-white pt-20' : 'bg-card border border-border rounded-xl text-foreground'}`}>
+      <div className={`flex items-center justify-between p-4 border-b ${isFullscreen ? 'border-white/20' : 'border-border'}`}>
+        <h3 className="text-lg font-semibold flex items-center">
+          <Icon name="Box" size={20} className="mr-2" />
+          Prohlížeč modelu
+        </h3>
+        <div className="flex items-center space-x-1">
+          <Button variant="ghost" size="icon" onClick={toggleFullscreen} className={isFullscreen ? 'hover:bg-white/10' : ''}>
+            <Icon name={isFullscreen ? "Minimize" : "Maximize"} size={16} />
+          </Button>
         </div>
-    );
+      </div>
+      
+      <div ref={mountRef} className="flex-grow relative min-h-[300px]">
+        {!selectedFile && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <p className={isFullscreen ? 'text-gray-400' : 'text-muted-foreground'}>Po nahrání se zde zobrazí model.</p>
+          </div>
+        )}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <p>Analyzuji model...</p>
+          </div>
+        )}
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-red-500/10">
+            <p className="text-red-500 text-sm px-4 text-center">{error}</p>
+          </div>
+        )}
+      </div>
+
+      {modelInfo && (
+        <div className={`p-4 border-t text-sm ${isFullscreen ? 'border-white/20' : 'border-border'}`}>
+          <h4 className="font-medium mb-2">Analýza modelu</h4>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <p className={isFullscreen ? 'text-gray-400' : 'text-muted-foreground'}>Rozměry (X/Y/Z)</p>
+              <p className="font-mono">{modelInfo.dimensions.x.toFixed(1)}/{modelInfo.dimensions.y.toFixed(1)}/{modelInfo.dimensions.z.toFixed(1)} mm</p>
+            </div>
+            <div>
+              <p className={isFullscreen ? 'text-gray-400' : 'text-muted-foreground'}>Objem</p>
+              <p className="font-mono">{(modelInfo.volume / 1000).toFixed(2)} cm³</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default ModelViewer;

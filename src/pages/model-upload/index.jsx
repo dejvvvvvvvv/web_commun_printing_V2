@@ -42,11 +42,13 @@ const ModelUpload = () => {
   };
 
   const handleRemoveFile = (fileId) => {
-    setUploadedFiles(prev => prev?.filter(file => file?.id !== fileId));
+    const newUploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
+    setUploadedFiles(newUploadedFiles);
+
     if (selectedFile?.id === fileId) {
-      const remainingFiles = uploadedFiles?.filter(file => file?.id !== fileId);
-      setSelectedFile(remainingFiles?.length > 0 ? remainingFiles?.[0] : null);
-      if (remainingFiles?.length === 0) {
+      const newSelectedFile = newUploadedFiles.length > 0 ? newUploadedFiles[0] : null;
+      setSelectedFile(newSelectedFile);
+      if (!newSelectedFile) {
         setCurrentStep(1);
       }
     }
@@ -245,7 +247,7 @@ const ModelUpload = () => {
             {/* Right Column - Sidebar */}
             <div className="space-y-6">
               {/* Model Viewer */}
-              <ModelViewer selectedFile={selectedFile} onClose={() => {}} />
+              <ModelViewer selectedFile={selectedFile} />
 
               {/* Quick Actions */}
               <div className="bg-card border border-border rounded-xl p-6">
