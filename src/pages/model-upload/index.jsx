@@ -150,6 +150,7 @@ const ModelUpload = () => {
                   <FileUploadZone
                     onFilesUploaded={handleFilesUploaded}
                     uploadedFiles={uploadedFiles}
+                    onRemoveFile={handleResetUpload}
                   />
                 </div>
               )}
