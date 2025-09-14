@@ -139,7 +139,7 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
                 <Button variant="ghost" size="icon" onClick={() => setIsFullScreen(true)} aria-label="Celá obrazovka"><Icon name="Expand" size={16} /></Button>
                 <Button variant="ghost" size="icon" onClick={handleRemove} aria-label="Odstranit model"><Icon name="X" size={16} /></Button>
             </div>
-            <div className="w-full h-full cursor-pointer" onClick={() => setIsFullScreen(true)}>
+            <div className="w-full h-full">
                 <Suspense fallback={
                     <div className="flex flex-col items-center justify-center h-full">
                         <Icon name="Loader" className="animate-spin text-primary" size={32} />
