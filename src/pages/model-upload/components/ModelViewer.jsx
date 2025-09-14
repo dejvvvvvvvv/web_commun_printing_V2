@@ -79,13 +79,8 @@ const ModelInfo = ({ file }) => {
 // 3. FullScreen Modal
 const FullScreenViewer = ({ fileUrl, onClose }) => {
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-            <div className="relative w-[90vw] h-[90vh] bg-transparent" onClick={(e) => e.stopPropagation()}>
-                <div className="absolute top-2 right-2 z-20">
-                    <Button variant="ghost" size="icon" onClick={onClose} aria-label="Zavřít celé okno">
-                        <Icon name="Minimize" size={28} />
-                    </Button>
-                </div>
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/70 backdrop-blur-sm p-4 sm:p-6" onClick={onClose}>
+            <div className="relative w-full flex-1" onClick={(e) => e.stopPropagation()}>
                 <Suspense fallback={
                     <div className="flex flex-col items-center justify-center h-full"><Icon name="Loader" className="animate-spin text-primary" size={32} /></div>
                 }>
@@ -99,6 +94,17 @@ const FullScreenViewer = ({ fileUrl, onClose }) => {
                         <OrbitControls autoRotate autoRotateSpeed={1.0} />
                     </Canvas>
                 </Suspense>
+            </div>
+            <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <Button 
+                    variant="secondary" 
+                    size="icon" 
+                    onClick={onClose} 
+                    aria-label="Zavřít celé okno" 
+                    className="h-14 w-14 rounded-full bg-background/50 hover:bg-background/70 backdrop-blur-md"
+                >
+                    <Icon name="Minimize" size={32} />
+                </Button>
             </div>
         </div>
     );
