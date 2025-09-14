@@ -1,29 +1,46 @@
-import React from 'react';
+import React, { Suspense } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Stage } from '@react-three/drei';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
+const Model = () => {
+  return (
+    <mesh>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="#1E90FF" />
+    </mesh>
+  );
+};
+
 const ModelViewer = ({ selectedFile, onRemove }) => {
   return (
-    <div className="relative bg-card border border-border rounded-xl aspect-square flex flex-col items-center justify-center p-6 text-center">
+    <div className="relative bg-card border border-border rounded-xl aspect-square flex flex-col items-center justify-center p-2 text-center">
       {selectedFile ? (
         <>
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-2 right-2 z-10">
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={onRemove}
               aria-label="Odstranit model"
             >
               <Icon name="X" size={16} />
             </Button>
           </div>
-          <div className="flex-grow flex flex-col items-center justify-center w-full">
-            <Icon name="Box" size={64} className="text-primary mb-4" />
-            <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-            </p>
-          </div>
+          <Suspense fallback={
+            <div className="flex flex-col items-center justify-center h-full">
+              <Icon name="Loader" className="animate-spin text-primary" size={32} />
+              <p className="text-sm text-muted-foreground mt-2">Načítám model...</p>
+            </div>
+          }>
+            <Canvas shadows camera={{ position: [0, 2, 5], fov: 50 }}>
+              <Stage environment="city" intensity={0.6}>
+                <Model />
+              </Stage>
+              <OrbitControls autoRotate />
+            </Canvas>
+          </Suspense>
         </>
       ) : (
         <div className="space-y-4">
