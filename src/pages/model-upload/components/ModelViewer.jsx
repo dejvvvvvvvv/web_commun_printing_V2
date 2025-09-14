@@ -77,13 +77,14 @@ const ModelInfo = ({ file }) => {
 };
 
 // 3. FullScreen Modal
-const FullScreenViewer = ({ fileUrl, onClose, onRemove }) => {
+const FullScreenViewer = ({ fileUrl, onClose }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
             <div className="relative w-[90vw] h-[90vh] bg-transparent" onClick={(e) => e.stopPropagation()}>
-                <div className="absolute top-2 right-2 z-20 flex space-x-1">
-                    <Button variant="ghost" size="icon" onClick={onClose} aria-label="Zavřít celé okno"><Icon name="Minimize" size={16} /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => { onClose(); onRemove(); }} aria-label="Odstranit model"><Icon name="X" size={16} /></Button>
+                <div className="absolute top-2 right-2 z-20">
+                    <Button variant="ghost" size="icon" onClick={onClose} aria-label="Zavřít celé okno">
+                        <Icon name="Minimize" size={20} />
+                    </Button>
                 </div>
                 <Suspense fallback={
                     <div className="flex flex-col items-center justify-center h-full"><Icon name="Loader" className="animate-spin text-primary" size={32} /></div>
@@ -170,7 +171,6 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
           <FullScreenViewer 
             fileUrl={fileUrl}
             onClose={() => setIsFullScreen(false)}
-            onRemove={handleRemove}
           />
       )}
     </>
