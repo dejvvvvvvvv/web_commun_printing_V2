@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
-// 1. Model Loader - Loads and prepares the 3D model geometry
+// 1. Model Loader
 const Model = ({ url }) => {
   const geom = useLoader(STLLoader, url);
   const mesh = useMemo(() => {
@@ -20,7 +20,7 @@ const Model = ({ url }) => {
   return <primitive object={mesh} />;
 };
 
-// 2. Model Info - Calculates and displays model dimensions and volume
+// 2. Model Info
 const ModelInfo = ({ file }) => {
     const [dimensions, setDimensions] = useState(null);
     const [volume, setVolume] = useState(null);
@@ -76,30 +76,25 @@ const ModelInfo = ({ file }) => {
     );
 };
 
-// 3. FullScreen Modal - Renders the viewer in a full-screen overlay
+// 3. FullScreen Modal
 const FullScreenViewer = ({ fileUrl, onClose, onRemove }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-            <div className="relative w-[90vw] h-[90vh] bg-card rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-[90vw] h-[90vh] bg-transparent" onClick={(e) => e.stopPropagation()}>
                 <div className="absolute top-2 right-2 z-20 flex space-x-1">
-                    <Button variant="ghost" size="icon" onClick={onClose} aria-label="Zavřít celé okno">
-                        <Icon name="Minimize" size={16} />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => { onClose(); onRemove(); }} aria-label="Odstranit model">
-                        <Icon name="X" size={16} />
-                    </Button>
+                    <Button variant="ghost" size="icon" onClick={onClose} aria-label="Zavřít celé okno"><Icon name="Minimize" size={16} /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => { onClose(); onRemove(); }} aria-label="Odstranit model"><Icon name="X" size={16} /></Button>
                 </div>
                 <Suspense fallback={
-                    <div className="flex flex-col items-center justify-center h-full">
-                        <Icon name="Loader" className="animate-spin text-primary" size={32} />
-                    </div>
+                    <div className="flex flex-col items-center justify-center h-full"><Icon name="Loader" className="animate-spin text-primary" size={32} /></div>
                 }>
-                    <Canvas shadows camera={{ position: [0, 0, 150], fov: 50 }}>
-                        <Stage environment="city" intensity={0.6} adjustCamera={1.2}>
-                            <Center>
-                                <Model url={fileUrl} />
-                            </Center>
-                        </Stage>
+                    <Canvas shadows camera={{ position: [0, 0, 150], fov: 50 }} gl={{ alpha: true }}>
+                        <ambientLight intensity={1.5} />
+                        <directionalLight position={[10, 10, 5]} intensity={2} />
+                        <directionalLight position={[-10, -5, -10]} intensity={1} />
+                        <Center>
+                            <Model url={fileUrl} />
+                        </Center>
                         <OrbitControls autoRotate autoRotateSpeed={1.0} />
                     </Canvas>
                 </Suspense>
@@ -108,8 +103,7 @@ const FullScreenViewer = ({ fileUrl, onClose, onRemove }) => {
     );
 };
 
-
-// 4. Main Component - Renders the standard viewer and controls the full-screen modal
+// 4. Main Component
 const ModelViewer = ({ selectedFile, onRemove }) => {
   const [fileUrl, setFileUrl] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -125,7 +119,7 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
   }, [selectedFile]);
   
   const handleRemove = () => {
-      setIsFullScreen(false); // Ensure fullscreen is closed if a file is removed
+      setIsFullScreen(false);
       onRemove();
   }
 
@@ -135,14 +129,9 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
         {selectedFile ? (
           <>
             <div className="absolute top-2 right-2 z-10 flex space-x-1">
-                <Button variant="ghost" size="icon" onClick={() => setIsFullScreen(true)} aria-label="Celá obrazovka">
-                    <Icon name="Expand" size={16} />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={handleRemove} aria-label="Odstranit model">
-                    <Icon name="X" size={16} />
-                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setIsFullScreen(true)} aria-label="Celá obrazovka"><Icon name="Expand" size={16} /></Button>
+                <Button variant="ghost" size="icon" onClick={handleRemove} aria-label="Odstranit model"><Icon name="X" size={16} /></Button>
             </div>
-            
             <div className="w-full h-full cursor-pointer" onClick={() => setIsFullScreen(true)}>
                 <Suspense fallback={
                     <div className="flex flex-col items-center justify-center h-full">
@@ -153,16 +142,13 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
                     {fileUrl && (
                         <Canvas shadows camera={{ position: [0, 0, 150], fov: 50 }}>
                             <Stage environment="city" intensity={0.6} adjustCamera={1.2}>
-                                <Center>
-                                    <Model url={fileUrl} />
-                                </Center>
+                                <Center><Model url={fileUrl} /></Center>
                             </Stage>
                             <OrbitControls autoRotate autoRotateSpeed={0.5} />
                         </Canvas>
                     )}
                 </Suspense>
             </div>
-            
             <div className="absolute bottom-0 left-0 right-0 p-3 bg-card/80 backdrop-blur-sm rounded-b-xl border-t border-border">
                 <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-foreground truncate" title={selectedFile.name}>{selectedFile.name}</p>
@@ -173,13 +159,9 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
           </>
         ) : (
           <div className="space-y-4 p-4">
-            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto">
-              <Icon name="Scan" size={40} className="text-muted-foreground" />
-            </div>
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto"><Icon name="Scan" size={40} className="text-muted-foreground" /></div>
             <h3 className="font-semibold text-foreground">Náhled modelu</h3>
-            <p className="text-sm text-muted-foreground">
-              Po nahrání souboru se zde zobrazí náhled vašeho 3D modelu a jeho parametry.
-            </p>
+            <p className="text-sm text-muted-foreground">Po nahrání souboru se zde zobrazí náhled vašeho 3D modelu a jeho parametry.</p>
           </div>
         )}
       </div>
