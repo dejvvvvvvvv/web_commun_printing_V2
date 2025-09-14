@@ -87,7 +87,7 @@ const FullScreenViewer = ({ fileUrl, onClose }) => {
                         size="icon"
                         onClick={onClose}
                         aria-label="Zavřít celé okno"
-                        className="h-12 w-12 rounded-full bg-background/30 hover:bg-background/50 backdrop-blur-md text-foreground"
+                        className="h-12 w-12 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-md text-white/90 hover:text-white transition-colors"
                     >
                         <Icon name="Minimize" size={28} />
                     </Button>
