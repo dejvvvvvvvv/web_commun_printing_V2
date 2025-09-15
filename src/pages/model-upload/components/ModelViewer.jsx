@@ -95,7 +95,7 @@ const FullScreenViewer = ({ fileUrl, onClose }) => {
                 <Suspense fallback={
                     <div className="flex flex-col items-center justify-center h-full"><Icon name="Loader" className="animate-spin text-primary" size={32} /></div>
                 }>
-                    <Canvas shadows camera={{ position: [0, 0, 150], fov: 50 }} gl={{ alpha: true }}>
+                    <Canvas shadows camera={{ position: [0, 0, 75], fov: 50 }} gl={{ alpha: true }}>
                         <ambientLight intensity={1.5} />
                         <directionalLight position={[10, 10, 5]} intensity={2} />
                         <directionalLight position={[-10, -5, -10]} intensity={1} />
