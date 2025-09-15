@@ -1,43 +1,118 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from '../../../firebase'; // Import Firebase instances
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import Icon from '../../../components/AppIcon';
 
-const RegistrationForm = ({ selectedRole, formData, onFormChange, onSubmit, isLoading, errors }) => {
+const RegistrationForm = ({ selectedRole }) => {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+    agreeTerms: false,
+    agreeMarketing: false,
+    // Host specific
+    companyName: '',
+    businessId: '',
+    city: '',
+    postalCode: '',
+    address: '',
+    confirmEquipment: false,
+  });
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const handleInputChange = (field, value) => {
-    onFormChange({ ...formData, [field]: value });
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: null }));
+    }
+     if (errors.general) {
+        setErrors(prev => ({ ...prev, general: '' }));
+    }
   };
 
-  const getPasswordStrength = (password) => {
-    if (!password) return { strength: 0, label: '', color: '' };
-    
-    let strength = 0;
-    if (password?.length >= 8) strength++;
-    if (/[A-Z]/?.test(password)) strength++;
-    if (/[a-z]/?.test(password)) strength++;
-    if (/[0-9]/?.test(password)) strength++;
-    if (/[^A-Za-z0-9]/?.test(password)) strength++;
+  const validateForm = () => {
+    const newErrors = {};
+    // Basic validations
+    if (!formData.firstName) newErrors.firstName = 'Jméno je povinné.';
+    if (!formData.lastName) newErrors.lastName = 'Příjmení je povinné.';
+    if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Neplatný formát emailu.';
+    if (!formData.password || formData.password.length < 6) newErrors.password = 'Heslo musí mít alespoň 6 znaků.';
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Hesla se neshodují.';
+    if (!formData.agreeTerms) newErrors.agreeTerms = 'Musíte souhlasit s podmínkami.';
 
-    const levels = [
-      { label: 'Velmi slabé', color: 'bg-red-500' },
-      { label: 'Slabé', color: 'bg-orange-500' },
-      { label: 'Střední', color: 'bg-yellow-500' },
-      { label: 'Silné', color: 'bg-blue-500' },
-      { label: 'Velmi silné', color: 'bg-green-500' }
-    ];
+    if (selectedRole === 'host') {
+      if (!formData.city) newErrors.city = 'Město je povinné.';
+      if (!formData.postalCode) newErrors.postalCode = 'PSČ je povinné.';
+      if (!formData.address) newErrors.address = 'Adresa je povinná.';
+      if (!formData.confirmEquipment) newErrors.confirmEquipment = 'Musíte potvrdit vlastnictví zařízení.';
+    }
 
-    return { strength, ...(levels?.[strength - 1] || levels?.[0]) };
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const passwordStrength = getPasswordStrength(formData?.password);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    try {
+      // 1. Create user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+
+      // 2. Create a user document in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone || '',
+        role: selectedRole,
+        createdAt: new Date(),
+        // Host specific data
+        ...(selectedRole === 'host' && {
+          companyName: formData.companyName || '',
+          businessId: formData.businessId || '',
+          address: {
+            city: formData.city,
+            postalCode: formData.postalCode,
+            street: formData.address,
+          },
+        })
+      });
+
+      // 3. Redirect to login page after successful registration
+      navigate('/login?status=success');
+
+    } catch (error) {
+      let errorMessage = 'Při registraci se vyskytla chyba.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'Tento e-mail je již používán.';
+      }
+      setErrors({ general: errorMessage });
+      console.error("Firebase registration error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
+        {errors.general && <p className="text-red-500">{errors.general}</p>}
       {/* Personal Information */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-foreground flex items-center space-x-2">
@@ -49,20 +124,21 @@ const RegistrationForm = ({ selectedRole, formData, onFormChange, onSubmit, isLo
           <Input
             label="Jméno *"
             type="text"
+            name="firstName"
             placeholder="Vaše jméno"
-            value={formData?.firstName}
-            onChange={(e) => handleInputChange('firstName', e?.target?.value)}
-            error={errors?.firstName}
+            value={formData.firstName}
+            onChange={handleInputChange}
+            error={errors.firstName}
             required
           />
-
           <Input
             label="Příjmení *"
             type="text"
+            name="lastName"
             placeholder="Vaše příjmení"
-            value={formData?.lastName}
-            onChange={(e) => handleInputChange('lastName', e?.target?.value)}
-            error={errors?.lastName}
+            value={formData.lastName}
+            onChange={handleInputChange}
+            error={errors.lastName}
             required
           />
         </div>
@@ -70,20 +146,21 @@ const RegistrationForm = ({ selectedRole, formData, onFormChange, onSubmit, isLo
         <Input
           label="E-mailová adresa *"
           type="email"
+          name="email"
           placeholder="vas@email.cz"
-          value={formData?.email}
-          onChange={(e) => handleInputChange('email', e?.target?.value)}
-          error={errors?.email}
+          value={formData.email}
+          onChange={handleInputChange}
+          error={errors.email}
           required
         />
-
         <Input
           label="Telefon"
           type="tel"
+          name="phone"
           placeholder="+420 123 456 789"
-          value={formData?.phone}
-          onChange={(e) => handleInputChange('phone', e?.target?.value)}
-          error={errors?.phone}
+          value={formData.phone}
+          onChange={handleInputChange}
+          error={errors.phone}
         />
       </div>
       {/* Password Section */}
@@ -97,194 +174,92 @@ const RegistrationForm = ({ selectedRole, formData, onFormChange, onSubmit, isLo
           <Input
             label="Heslo *"
             type={showPassword ? "text" : "password"}
+            name="password"
             placeholder="Vytvořte silné heslo"
-            value={formData?.password}
-            onChange={(e) => handleInputChange('password', e?.target?.value)}
-            error={errors?.password}
+            value={formData.password}
+            onChange={handleInputChange}
+            error={errors.password}
             required
           />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-9 text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-9 text-muted-foreground hover:text-foreground transition-colors">
             <Icon name={showPassword ? "EyeOff" : "Eye"} size={18} />
           </button>
         </div>
-
-        {/* Password Strength Indicator */}
-        {formData?.password && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Síla hesla:</span>
-              <span className={`font-medium ${
-                passwordStrength?.strength >= 3 ? 'text-green-600' : 
-                passwordStrength?.strength >= 2 ? 'text-yellow-600' : 'text-red-600'
-              }`}>
-                {passwordStrength?.label}
-              </span>
-            </div>
-            <div className="flex space-x-1">
-              {[1, 2, 3, 4, 5]?.map((level) => (
-                <div
-                  key={level}
-                  className={`h-1 flex-1 rounded-full ${
-                    level <= passwordStrength?.strength
-                      ? passwordStrength?.color
-                      : 'bg-muted'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="relative">
           <Input
             label="Potvrzení hesla *"
             type={showConfirmPassword ? "text" : "password"}
+            name="confirmPassword"
             placeholder="Zadejte heslo znovu"
-            value={formData?.confirmPassword}
-            onChange={(e) => handleInputChange('confirmPassword', e?.target?.value)}
-            error={errors?.confirmPassword}
+            value={formData.confirmPassword}
+            onChange={handleInputChange}
+            error={errors.confirmPassword}
             required
           />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-3 top-9 text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-9 text-muted-foreground hover:text-foreground transition-colors">
             <Icon name={showConfirmPassword ? "EyeOff" : "Eye"} size={18} />
           </button>
         </div>
       </div>
-      {/* Host Additional Information */}
+      
       {selectedRole === 'host' && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground flex items-center space-x-2">
             <Icon name="Building" size={20} />
             <span>Informace o podnikání</span>
           </h3>
-
-          <Input
-            label="Název společnosti"
-            type="text"
-            placeholder="Název vaší společnosti (volitelné)"
-            value={formData?.companyName}
-            onChange={(e) => handleInputChange('companyName', e?.target?.value)}
-            error={errors?.companyName}
-          />
-
-          <Input
-            label="IČO"
-            type="text"
-            placeholder="Identifikační číslo organizace"
-            value={formData?.businessId}
-            onChange={(e) => handleInputChange('businessId', e?.target?.value)}
-            error={errors?.businessId}
-          />
-
+          <Input label="Název společnosti" name="companyName" value={formData.companyName} onChange={handleInputChange} error={errors.companyName} />
+          <Input label="IČO" name="businessId" value={formData.businessId} onChange={handleInputChange} error={errors.businessId} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Město *"
-              type="text"
-              placeholder="Ostrava"
-              value={formData?.city}
-              onChange={(e) => handleInputChange('city', e?.target?.value)}
-              error={errors?.city}
-              required
-            />
-
-            <Input
-              label="PSČ *"
-              type="text"
-              placeholder="700 00"
-              value={formData?.postalCode}
-              onChange={(e) => handleInputChange('postalCode', e?.target?.value)}
-              error={errors?.postalCode}
-              required
-            />
+            <Input label="Město *" name="city" value={formData.city} onChange={handleInputChange} error={errors.city} required />
+            <Input label="PSČ *" name="postalCode" value={formData.postalCode} onChange={handleInputChange} error={errors.postalCode} required />
           </div>
-
-          <Input
-            label="Adresa *"
-            type="text"
-            placeholder="Ulice a číslo popisné"
-            value={formData?.address}
-            onChange={(e) => handleInputChange('address', e?.target?.value)}
-            error={errors?.address}
-            required
-          />
+          <Input label="Adresa *" name="address" value={formData.address} onChange={handleInputChange} error={errors.address} required />
         </div>
       )}
+
       {/* Legal Agreements */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-foreground flex items-center space-x-2">
           <Icon name="FileText" size={20} />
           <span>Právní souhlasy</span>
         </h3>
-
-        <div className="space-y-3">
+        <Checkbox
+          name="agreeTerms"
+          label={
+            <span className="text-sm">
+              Souhlasím s <Link to="/terms" className="text-primary hover:underline">obchodními podmínkami</Link> a <Link to="/privacy" className="text-primary hover:underline">zásadami ochrany osobních údajů</Link> *
+            </span>
+          }
+          checked={formData.agreeTerms}
+          onChange={handleInputChange}
+          error={errors.agreeTerms}
+          required
+        />
+        <Checkbox name="agreeMarketing" label="Souhlasím s marketingovými e-maily a novinkami" checked={formData.agreeMarketing} onChange={handleInputChange} />
+        {selectedRole === 'host' && (
           <Checkbox
-            label={
-              <span className="text-sm">
-                Souhlasím s{' '}
-                <Link to="/terms" className="text-primary hover:underline">
-                  obchodními podmínkami
-                </Link>{' '}
-                a{' '}
-                <Link to="/privacy" className="text-primary hover:underline">
-                  zásadami ochrany osobních údajů
-                </Link>{' '}
-                *
-              </span>
-            }
-            checked={formData?.agreeTerms}
-            onChange={(e) => handleInputChange('agreeTerms', e?.target?.checked)}
-            error={errors?.agreeTerms}
+            name="confirmEquipment"
+            label="Potvrzujem, že vlastním nebo mám oprávnění provozovat 3D tiskárny *"
+            checked={formData.confirmEquipment}
+            onChange={handleInputChange}
+            error={errors.confirmEquipment}
             required
           />
-
-          <Checkbox
-            label="Souhlasím s marketingovými e-maily a novinkami"
-            description="Můžete kdykoli odhlásit v nastavení účtu"
-            checked={formData?.agreeMarketing}
-            onChange={(e) => handleInputChange('agreeMarketing', e?.target?.checked)}
-          />
-
-          {selectedRole === 'host' && (
-            <Checkbox
-              label="Potvrzujem, že vlastním nebo mám oprávnění provozovat 3D tiskárny *"
-              checked={formData?.confirmEquipment}
-              onChange={(e) => handleInputChange('confirmEquipment', e?.target?.checked)}
-              error={errors?.confirmEquipment}
-              required
-            />
-          )}
-        </div>
+        )}
       </div>
-      {/* Submit Button */}
+
       <div className="pt-4">
-        <Button
-          type="submit"
-          variant="default"
-          size="lg"
-          fullWidth
-          loading={isLoading}
-          iconName="UserPlus"
-          iconPosition="left"
-        >
+        <Button type="submit" variant="default" size="lg" fullWidth loading={isLoading} iconName="UserPlus" iconPosition="left">
           {isLoading ? 'Vytváření účtu...' : 'Vytvořit účet'}
         </Button>
       </div>
-      {/* Login Link */}
+      
       <div className="text-center pt-4 border-t border-border">
         <p className="text-sm text-muted-foreground">
           Již máte účet?{' '}
-          <Link 
-            to="/login" 
-            className="text-primary hover:underline font-medium"
-          >
+          <Link to="/login" className="text-primary hover:underline font-medium">
             Přihlásit se
           </Link>
         </p>

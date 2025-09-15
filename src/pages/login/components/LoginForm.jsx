@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from '../../../firebase'; // Import Firebase auth instance
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { Checkbox } from '../../../components/ui/Checkbox';
@@ -15,13 +17,6 @@ const LoginForm = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mock credentials for different user roles
-  const mockCredentials = {
-    customer: { email: 'customer@communprinting.cz', password: 'customer123' },
-    host: { email: 'host@communprinting.cz', password: 'host123' },
-    admin: { email: 'admin@communprinting.cz', password: 'admin123' }
-  };
-
   const validateForm = () => {
     const newErrors = {};
 
@@ -33,8 +28,6 @@ const LoginForm = () => {
 
     if (!formData?.password) {
       newErrors.password = 'Heslo je povinné';
-    } else if (formData?.password?.length < 6) {
-      newErrors.password = 'Heslo musí mít alespoň 6 znaků';
     }
 
     setErrors(newErrors);
@@ -48,12 +41,11 @@ const LoginForm = () => {
       [name]: type === 'checkbox' ? checked : value
     }));
 
-    // Clear error when user starts typing
     if (errors?.[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    if (errors.general) {
+        setErrors(prev => ({ ...prev, general: '' }));
     }
   };
 
@@ -65,49 +57,37 @@ const LoginForm = () => {
     setIsLoading(true);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Sign in with Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
 
-      // Check credentials and determine user role
-      let userRole = null;
-      let isValidCredentials = false;
-
-      Object.entries(mockCredentials)?.forEach(([role, credentials]) => {
-        if (formData?.email === credentials?.email && formData?.password === credentials?.password) {
-          userRole = role;
-          isValidCredentials = true;
-        }
-      });
-
-      if (!isValidCredentials) {
-        setErrors({
-          general: 'Neplatné přihlašovací údaje. Zkuste znovu.'
-        });
-        setIsLoading(false);
-        return;
-      }
+      // TODO: In a real app, you would get the user's role from Firestore or a custom claim
+      // For now, we'll default to 'customer'
+      const userRole = 'customer';
 
       // Store user session (in real app, this would be handled by auth context)
       localStorage.setItem('userRole', userRole);
       localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userEmail', formData?.email);
+      localStorage.setItem('userEmail', user.email);
 
       // Redirect based on user role
-      switch (userRole) {
-        case 'customer': navigate('/customer-dashboard');
-          break;
-        case 'host': navigate('/host-dashboard');
-          break;
-        case 'admin': navigate('/customer-dashboard'); // Admin uses customer dashboard for now
-          break;
-        default:
-          navigate('/customer-dashboard');
-      }
+      navigate('/customer-dashboard');
 
     } catch (error) {
-      setErrors({
-        general: 'Chyba při přihlašování. Zkuste to znovu.'
-      });
+      let errorMessage = 'Chyba při přihlašování. Zkuste to znovu.';
+      switch (error.code) {
+        case 'auth/invalid-credential':
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+          errorMessage = 'Neplatná kombinace emailu a hesla.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Příliš mnoho pokusů o přihlášení. Zkuste to prosím později.';
+          break;
+        default:
+          console.error("Firebase login error:", error);
+      }
+      setErrors({ general: errorMessage });
     } finally {
       setIsLoading(false);
     }
