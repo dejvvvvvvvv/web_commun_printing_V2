@@ -21,7 +21,7 @@ const Model = ({ url }) => {
 };
 
 // 2. Model Info
-const ModelInfo = ({ file }) => {
+const ModelInfo = ({ file, pricing }) => {
     const [dimensions, setDimensions] = useState(null);
     const [volume, setVolume] = useState(null);
     const [error, setError] = useState(null);
@@ -72,6 +72,12 @@ const ModelInfo = ({ file }) => {
             <div className="text-center p-2 bg-muted/50 rounded-md"><p className="font-bold text-foreground">{(dimensions.y).toFixed(1)}</p><p className="text-muted-foreground">Y (mm)</p></div>
             <div className="text-center p-2 bg-muted/50 rounded-md"><p className="font-bold text-foreground">{(dimensions.z).toFixed(1)}</p><p className="text-muted-foreground">Z (mm)</p></div>
             <div className="col-span-3 text-center p-2 bg-muted/50 rounded-md"><p className="font-bold text-foreground">{(volume / 1000).toFixed(2)} cm³</p><p className="text-muted-foreground">Objem</p></div>
+            {pricing && pricing.total > 0 && (
+              <div className="col-span-3 text-center p-2 bg-primary/10 rounded-md mt-2">
+                <p className="font-bold text-primary text-sm">~ {new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0 }).format(pricing.total)}</p>
+                <p className="text-muted-foreground text-xs">Odhad ceny</p>
+              </div>
+            )}
         </div>
     );
 };
@@ -111,7 +117,7 @@ const FullScreenViewer = ({ fileUrl, onClose }) => {
 };
 
 // 4. Main Component
-const ModelViewer = ({ selectedFile, onRemove }) => {
+const ModelViewer = ({ selectedFile, onRemove, pricing }) => {
   const [fileUrl, setFileUrl] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -161,7 +167,7 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
                     <p className="text-sm font-medium text-foreground truncate" title={selectedFile.name}>{selectedFile.name}</p>
                     <p className="text-xs text-muted-foreground whitespace-nowrap pl-2">{selectedFile.size > 0 ? (selectedFile.size / (1024 * 1024)).toFixed(2) + " MB" : ""}</p>
                 </div>
-                <ModelInfo file={selectedFile} />
+                <ModelInfo file={selectedFile} pricing={pricing} />
             </div>
           </>
         ) : (

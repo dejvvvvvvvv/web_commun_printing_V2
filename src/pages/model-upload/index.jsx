@@ -24,13 +24,32 @@ const ModelUpload = () => {
   ];
 
   useEffect(() => {
-    if (uploadedFiles?.length > 0 && !selectedFile) {
-      setSelectedFile(uploadedFiles?.[0]);
+    if (uploadedFiles.length > 0 && !selectedFile) {
+      setSelectedFile(uploadedFiles[0]);
     }
   }, [uploadedFiles, selectedFile]);
 
+  // Set default config to trigger price calculation on upload
   useEffect(() => {
-    if (uploadedFiles?.length > 0 && currentStep === 1) {
+    if (selectedFile && !printConfig) {
+      const defaultConfig = {
+        material: 'pla',
+        quality: 'standard',
+        infill: 20,
+        quantity: 1,
+        postProcessing: [],
+        expressDelivery: false,
+      };
+      handleConfigChange(defaultConfig);
+    }
+    if (!selectedFile && printConfig) {
+      setPrintConfig(null);
+      setPricing(null);
+    }
+  }, [selectedFile, printConfig]);
+
+  useEffect(() => {
+    if (uploadedFiles.length > 0 && currentStep === 1) {
       setTimeout(() => setCurrentStep(2), 1000);
     }
   }, [uploadedFiles, currentStep]);
@@ -83,11 +102,11 @@ const ModelUpload = () => {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return uploadedFiles?.length > 0;
+        return uploadedFiles.length > 0;
       case 2:
         return printConfig && selectedFile;
       case 3:
-        return pricing && printConfig && selectedFile;
+        return pricing && pricing.total > 0 && printConfig && selectedFile;
       default:
         return false;
     }
@@ -114,28 +133,28 @@ const ModelUpload = () => {
 
           <div className="mb-8">
             <div className="flex items-center justify-between max-w-2xl">
-              {steps?.map((step, index) => (
-                <div key={step?.id} className="flex items-center">
+              {steps.map((step, index) => (
+                <div key={step.id} className="flex items-center">
                   <div className="flex flex-col items-center">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-colors ${
-                      currentStep >= step?.id
+                      currentStep >= step.id
                         ? 'bg-primary border-primary text-primary-foreground'
                         : 'border-border text-muted-foreground'
                     }`}>
-                      <Icon name={step?.icon} size={20} />
+                      <Icon name={step.icon} size={20} />
                     </div>
                     <div className="mt-2 text-center">
                       <p className={`text-sm font-medium ${
-                        currentStep >= step?.id ? 'text-foreground' : 'text-muted-foreground'
+                        currentStep >= step.id ? 'text-foreground' : 'text-muted-foreground'
                       }`}>
-                        {step?.title}
+                        {step.title}
                       </p>
-                      <p className="text-xs text-muted-foreground">{step?.description}</p>
+                      <p className="text-xs text-muted-foreground">{step.description}</p>
                     </div>
                   </div>
-                  {index < steps?.length - 1 && (
+                  {index < steps.length - 1 && (
                     <div className={`w-24 h-0.5 mx-4 transition-colors ${
-                      currentStep > step?.id ? 'bg-primary' : 'bg-border'
+                      currentStep > step.id ? 'bg-primary' : 'bg-border'
                     }`} />
                   )}
                 </div>
@@ -159,6 +178,7 @@ const ModelUpload = () => {
                   <PrintConfiguration
                     selectedFile={selectedFile}
                     onConfigChange={handleConfigChange}
+                    initialConfig={printConfig}
                   />
                 </div>
               )}
@@ -178,7 +198,7 @@ const ModelUpload = () => {
                           <div>
                             <p className="text-sm font-medium text-foreground">{selectedFile?.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              {selectedFile && (selectedFile?.size / (1024 * 1024))?.toFixed(2)} MB
+                              {selectedFile && (selectedFile.size / (1024 * 1024)).toFixed(2)} MB
                             </p>
                           </div>
                         </div>
@@ -190,19 +210,19 @@ const ModelUpload = () => {
                         <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
                           <div>
                             <p className="text-xs text-muted-foreground">Materiál</p>
-                            <p className="text-sm font-medium text-foreground">{printConfig?.material?.toUpperCase()}</p>
+                            <p className="text-sm font-medium text-foreground">{printConfig.material.toUpperCase()}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Kvalita</p>
-                            <p className="text-sm font-medium text-foreground">{printConfig?.quality}</p>
+                            <p className="text-sm font-medium text-foreground">{printConfig.quality}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Množství</p>
-                            <p className="text-sm font-medium text-foreground">{printConfig?.quantity} ks</p>
+                            <p className="text-sm font-medium text-foreground">{printConfig.quantity} ks</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Výplň</p>
-                            <p className="text-sm font-medium text-foreground">{printConfig?.infill}%</p>
+                            <p className="text-sm font-medium text-foreground">{printConfig.infill}%</p>
                           </div>
                         </div>
                       )}
@@ -218,7 +238,17 @@ const ModelUpload = () => {
             </div>
 
             <div className="space-y-6">
-              <ModelViewer selectedFile={selectedFile} onRemove={handleResetUpload} />
+              <ModelViewer selectedFile={selectedFile} onRemove={handleResetUpload} pricing={pricing} />
+               {/* Hidden calculator for initial estimate */}
+              {selectedFile && printConfig && currentStep < 3 && (
+                  <div style={{ display: 'none' }}>
+                      <PricingCalculator
+                          config={printConfig}
+                          selectedFile={selectedFile}
+                          onPriceChange={handlePriceChange}
+                      />
+                  </div>
+              )}
               <div className="bg-card border border-border rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Rychlé akce</h3>
                 <div className="space-y-3">
