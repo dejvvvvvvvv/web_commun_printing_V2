@@ -26,10 +26,13 @@ const PricingCalculator = ({ config, selectedFile, onPriceChange }) => {
 
   // Quality pricing multipliers
   const qualityMultipliers = {
-    draft: 0.8,
+    draft: 0.7,
     standard: 1.0,
     fine: 1.3,
-    ultra: 1.8
+    ultra: 1.8,
+    nozzle_04: 1.0, // Same as standard
+    nozzle_06: 0.6,
+    nozzle_08: 0.4
   };
 
   // Post-processing prices
@@ -101,7 +104,10 @@ const PricingCalculator = ({ config, selectedFile, onPriceChange }) => {
       draft: 0,
       standard: 1,
       fine: 2,
-      ultra: 3
+      ultra: 3,
+      nozzle_04: 1,
+      nozzle_06: -1, // Faster
+      nozzle_08: -2  // Fastest
     };
     
     const totalDays = baseDeliveryDays + (qualityDelay?.[config?.quality] || 1);

@@ -30,7 +30,10 @@ const PrintConfiguration = ({ onConfigChange, selectedFile }) => {
     { value: 'draft', label: 'Rychlý (0.3mm)', description: 'Rychlý tisk, nižší kvalita' },
     { value: 'standard', label: 'Standardní (0.2mm)', description: 'Vyvážený poměr kvality a rychlosti' },
     { value: 'fine', label: 'Jemný (0.15mm)', description: 'Vysoká kvalita, pomalejší tisk' },
-    { value: 'ultra', label: 'Ultra jemný (0.1mm)', description: 'Nejvyšší kvalita, velmi pomalý' }
+    { value: 'ultra', label: 'Ultra jemný (0.1mm)', description: 'Nejvyšší kvalita, velmi pomalý' },
+    { value: 'nozzle_04', label: 'Tryska 0.4mm', description: 'Standardní a nejuniverzálnější volba' },
+    { value: 'nozzle_06', label: 'Tryska 0.6mm', description: 'Rychlejší tisk, ideální pro větší modely' },
+    { value: 'nozzle_08', label: 'Tryska 0.8mm', description: 'Velmi rychlý tisk, pro robustní díly' }
   ];
 
   const colors = [
@@ -71,7 +74,10 @@ const PrintConfiguration = ({ onConfigChange, selectedFile }) => {
       draft: 0.7,
       standard: 1,
       fine: 1.5,
-      ultra: 2.2
+      ultra: 2.2,
+      nozzle_04: 1.0,
+      nozzle_06: 0.6,
+      nozzle_08: 0.4
     };
     const infillMultiplier = 1 + (config?.infill / 100) * 0.5;
     
