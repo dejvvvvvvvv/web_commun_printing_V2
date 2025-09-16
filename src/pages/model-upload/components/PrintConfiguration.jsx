@@ -71,13 +71,13 @@ const PrintConfiguration = ({ onConfigChange, selectedFile }) => {
   const getEstimatedTime = () => {
     const baseTime = 4; // hours
     const qualityMultiplier = {
-      draft: 0.7,
-      standard: 1,
-      fine: 1.5,
-      ultra: 2.2,
-      nozzle_04: 1.0,
-      nozzle_06: 0.6,
-      nozzle_08: 0.4
+        nozzle_08: 0.4,
+        nozzle_06: 0.6,
+        nozzle_04: 0.8,
+        draft: 0.9,
+        standard: 1,
+        fine: 1.5,
+        ultra: 2.2
     };
     const infillMultiplier = 1 + (config?.infill / 100) * 0.5;
     
