@@ -228,26 +228,30 @@ const ModelUpload = () => {
                       )}
                     </div>
                   </div>
-                  <PricingCalculator
-                    config={printConfig}
-                    selectedFile={selectedFile}
-                    onPriceChange={handlePriceChange}
-                  />
                 </div>
               )}
+              <PricingCalculator
+                config={printConfig}
+                selectedFile={selectedFile}
+                onPriceChange={handlePriceChange}
+              />
             </div>
 
             <div className="space-y-6">
-              <ModelViewer selectedFile={selectedFile} onRemove={handleResetUpload} pricing={pricing} />
-               {/* Hidden calculator for initial estimate */}
-              {selectedFile && printConfig && currentStep < 3 && (
-                  <div style={{ display: 'none' }}>
-                      <PricingCalculator
-                          config={printConfig}
-                          selectedFile={selectedFile}
-                          onPriceChange={handlePriceChange}
-                      />
+              <ModelViewer selectedFile={selectedFile} onRemove={handleResetUpload} />
+              {pricing && pricing.total > 0 && (
+                <div className="bg-card border border-border rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                    <Icon name="Cpu" size={20} className="mr-2" />
+                    Odhad tisku
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between items-center">
+                      <p className="text-muted-foreground">Odhadovaná cena</p>
+                      <p className="font-semibold text-primary text-lg">~ {new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0 }).format(pricing.total)}</p>
+                    </div>
                   </div>
+                </div>
               )}
               <div className="bg-card border border-border rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Rychlé akce</h3>
