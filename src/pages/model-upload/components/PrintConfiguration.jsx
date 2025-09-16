@@ -27,13 +27,13 @@ const PrintConfiguration = ({ onConfigChange, selectedFile }) => {
   ];
 
   const qualities = [
-    { value: 'draft', label: 'Rychlý (0.3mm)', description: 'Rychlý tisk, nižší kvalita' },
-    { value: 'standard', label: 'Standardní (0.2mm)', description: 'Vyvážený poměr kvality a rychlosti' },
-    { value: 'fine', label: 'Jemný (0.15mm)', description: 'Vysoká kvalita, pomalejší tisk' },
-    { value: 'ultra', label: 'Ultra jemný (0.1mm)', description: 'Nejvyšší kvalita, velmi pomalý' },
-    { value: 'nozzle_04', label: 'Tryska 0.4mm', description: 'Standardní a nejuniverzálnější volba' },
-    { value: 'nozzle_06', label: 'Tryska 0.6mm', description: 'Rychlejší tisk, ideální pro větší modely' },
-    { value: 'nozzle_08', label: 'Tryska 0.8mm', description: 'Velmi rychlý tisk, pro robustní díly' }
+    { value: 'nozzle_08', label: 'Extra hrubý (0.8mm)', description: 'Extrémně rychlý tisk pro robustní díly.' },
+    { value: 'nozzle_06', label: 'Hrubý (0.6mm)', description: 'Rychlý tisk ideální pro velké modely.' },
+    { value: 'nozzle_04', label: 'Rychlý (0.4mm)', description: 'Urychlený tisk pro méně detailní objekty.' },
+    { value: 'draft', label: 'Návrhový (0.3mm)', description: 'Nejrychlejší pro ověření konceptu, nízká kvalita.' },
+    { value: 'standard', label: 'Standardní (0.2mm)', description: 'Vyvážený poměr kvality a rychlosti.' },
+    { value: 'fine', label: 'Jemný (0.15mm)', description: 'Vysoká kvalita pro detailní modely.' },
+    { value: 'ultra', label: 'Ultra jemný (0.1mm)', description: 'Nejvyšší možná kvalita, velmi pomalý tisk.' }
   ];
 
   const colors = [
