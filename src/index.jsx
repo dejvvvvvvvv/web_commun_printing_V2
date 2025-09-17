@@ -1,3 +1,4 @@
+import "./i18n"; // Import the i18n configuration
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
