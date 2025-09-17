@@ -7,6 +7,8 @@ import FileUploadZone from './components/FileUploadZone';
 import ModelViewer from './components/ModelViewer';
 import PrintConfiguration from './components/PrintConfiguration';
 import PricingCalculator from './components/PricingCalculator';
+import { Checkbox } from "../../components/ui/checkbox";
+import { Label } from "../../components/ui/label";
 
 const ModelUpload = () => {
   const navigate = useNavigate();
@@ -18,6 +20,7 @@ const ModelUpload = () => {
   const [pricings, setPricings] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [isModelListExpanded, setIsModelListExpanded] = useState(false);
+  const [applyConfigToAll, setApplyConfigToAll] = useState(false);
 
   const steps = [
     { id: 1, title: 'Nahrání souborů', icon: 'Upload', description: 'Nahrajte 3D modely' },
@@ -31,7 +34,6 @@ const ModelUpload = () => {
     }
   }, [uploadedFiles, selectedFile]);
 
-  // Set default config for the selected file if it doesn't have one
   useEffect(() => {
     if (selectedFile && !printConfigs[selectedFile.name]) {
       const defaultConfig = {
@@ -52,8 +54,18 @@ const ModelUpload = () => {
     }
   }, [uploadedFiles, currentStep]);
 
+  useEffect(() => {
+    if (applyConfigToAll && selectedFile && printConfigs[selectedFile.name]) {
+      const currentConfig = printConfigs[selectedFile.name];
+      const newPrintConfigs = {};
+      uploadedFiles.forEach(file => {
+        newPrintConfigs[file.name] = currentConfig;
+      });
+      setPrintConfigs(newPrintConfigs);
+    }
+  }, [applyConfigToAll, printConfigs[selectedFile?.name]]);
+
   const handleFilesUploaded = (newFile) => {
-    // Prevent duplicates
     if (!uploadedFiles.some(file => file.name === newFile.name)) {
         setUploadedFiles(prev => [...prev, newFile]);
     }
@@ -321,6 +333,14 @@ const ModelUpload = () => {
                                 <span className="sr-only">{isModelListExpanded ? 'Sbalit seznam' : 'Rozbalit seznam'}</span>
                             </Button>
                         </div>
+                        {uploadedFiles.length > 1 && (
+                            <div id="ulozeni_parametru" className="pt-4 mt-4 border-t border-border flex items-center space-x-2">
+                                <Checkbox id="apply-to-all" checked={applyConfigToAll} onCheckedChange={setApplyConfigToAll} />
+                                <Label htmlFor="apply-to-all" className="text-sm font-medium leading-none cursor-pointer">
+                                    Použít pro všechny modely
+                                </Label>
+                            </div>
+                        )}
                     </div>
                 )}
               {currentPricing && currentPricing.total > 0 && (
