@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
 
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
 
-const PrintConfiguration = ({ onConfigChange, selectedFile }) => {
-  const [config, setConfig] = useState({
+const PrintConfiguration = ({ onConfigChange, selectedFile, initialConfig }) => {
+  const [config, setConfig] = useState(initialConfig || {
     material: 'pla',
     quality: 'standard',
     infill: 20,
@@ -16,6 +16,12 @@ const PrintConfiguration = ({ onConfigChange, selectedFile }) => {
     expressDelivery: false,
     color: 'white'
   });
+
+  useEffect(() => {
+    if (initialConfig) {
+      setConfig(initialConfig);
+    }
+  }, [initialConfig]);
 
   const materials = [
     { value: 'pla', label: 'PLA', description: 'Základní materiál, snadný tisk' },
@@ -285,7 +291,7 @@ const PrintConfiguration = ({ onConfigChange, selectedFile }) => {
               <Icon name="Thermometer" size={20} className="text-error" />
             </div>
             <p className="text-sm font-medium text-foreground">
-              {config?.material === 'pla' ? '200°C' :
+              {config?.material === 'pla' ? '200°C' : 
                config?.material === 'abs' ? '250°C' :
                config?.material === 'petg' ? '230°C' :
                config?.material === 'tpu' ? '220°C' : '210°C'}
