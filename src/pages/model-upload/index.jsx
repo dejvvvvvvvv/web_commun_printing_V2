@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
@@ -10,11 +10,12 @@ import PricingCalculator from './components/PricingCalculator';
 
 const ModelUpload = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [printConfig, setPrintConfig] = useState(null);
-  const [pricing, setPricing] = useState(null);
+  const [printConfigs, setPrintConfigs] = useState({});
+  const [pricings, setPricings] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
 
   const steps = [
@@ -29,9 +30,9 @@ const ModelUpload = () => {
     }
   }, [uploadedFiles, selectedFile]);
 
-  // Set default config to trigger price calculation on upload
+  // Set default config for the selected file if it doesn't have one
   useEffect(() => {
-    if (selectedFile && !printConfig) {
+    if (selectedFile && !printConfigs[selectedFile.name]) {
       const defaultConfig = {
         material: 'pla',
         quality: 'standard',
@@ -42,11 +43,7 @@ const ModelUpload = () => {
       };
       handleConfigChange(defaultConfig);
     }
-    if (!selectedFile && printConfig) {
-      setPrintConfig(null);
-      setPricing(null);
-    }
-  }, [selectedFile, printConfig]);
+  }, [selectedFile, printConfigs]);
 
   useEffect(() => {
     if (uploadedFiles.length > 0 && currentStep === 1) {
@@ -54,24 +51,57 @@ const ModelUpload = () => {
     }
   }, [uploadedFiles, currentStep]);
 
-  const handleFilesUploaded = (newFile) => {
-    setUploadedFiles(prev => [...prev, newFile]);
+  const handleFilesUploaded = (newFiles) => {
+    const newUniqueFiles = newFiles.filter(
+      (newFile) => !uploadedFiles.some((existingFile) => existingFile.name === newFile.name)
+    );
+    setUploadedFiles(prev => [...prev, ...newUniqueFiles]);
+  };
+  
+  const handleAddModelClick = () => {
+    fileInputRef.current.click();
   };
 
   const handleResetUpload = () => {
     setUploadedFiles([]);
     setSelectedFile(null);
-    setPrintConfig(null);
-    setPricing(null);
+    setPrintConfigs({});
+    setPricings({});
     setCurrentStep(1);
+  };
+  
+  const handleFileDelete = (fileToDelete) => {
+    const newUploadedFiles = uploadedFiles.filter(file => file.name !== fileToDelete.name);
+    
+    const newPrintConfigs = { ...printConfigs };
+    delete newPrintConfigs[fileToDelete.name];
+    
+    const newPricings = { ...pricings };
+    delete newPricings[fileToDelete.name];
+
+    setUploadedFiles(newUploadedFiles);
+    setPrintConfigs(newPrintConfigs);
+    setPricings(newPricings);
+
+    if (selectedFile && selectedFile.name === fileToDelete.name) {
+      if (newUploadedFiles.length > 0) {
+        setSelectedFile(newUploadedFiles[0]);
+      } else {
+        handleResetUpload();
+      }
+    }
   };
 
   const handleConfigChange = (config) => {
-    setPrintConfig(config);
+    if (selectedFile) {
+      setPrintConfigs(prev => ({ ...prev, [selectedFile.name]: config }));
+    }
   };
 
   const handlePriceChange = (newPricing) => {
-    setPricing(newPricing);
+    if (selectedFile) {
+      setPricings(prev => ({ ...prev, [selectedFile.name]: newPricing }));
+    }
   };
 
   const handleNextStep = () => {
@@ -92,21 +122,24 @@ const ModelUpload = () => {
     navigate('/printer-catalog', {
       state: {
         uploadedFiles,
-        printConfig,
-        pricing,
+        printConfigs,
+        pricings,
         fromUpload: true
       }
     });
   };
+  
+  const currentConfig = selectedFile ? printConfigs[selectedFile.name] : null;
+  const currentPricing = selectedFile ? pricings[selectedFile.name] : null;
 
   const canProceed = () => {
     switch (currentStep) {
       case 1:
         return uploadedFiles.length > 0;
       case 2:
-        return printConfig && selectedFile;
+        return currentConfig && selectedFile;
       case 3:
-        return pricing && pricing.total > 0 && printConfig && selectedFile;
+        return currentPricing && currentPricing.total > 0 && currentConfig && selectedFile;
       default:
         return false;
     }
@@ -115,6 +148,14 @@ const ModelUpload = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={(e) => handleFilesUploaded(Array.from(e.target.files))} 
+        style={{ display: 'none' }} 
+        multiple 
+        accept=".stl,.obj,.3mf"
+      />
       <div className="pt-16">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8">
@@ -167,18 +208,19 @@ const ModelUpload = () => {
               {currentStep === 1 && (
                 <div className="space-y-6">
                   <FileUploadZone
-                    onFilesUploaded={handleFilesUploaded}
+                    onFilesUploaded={(files) => handleFilesUploaded(Array.from(files))}
                     uploadedFiles={uploadedFiles}
-                    onRemoveFile={handleResetUpload}
+                    onRemoveFile={handleFileDelete}
                   />
                 </div>
               )}
               {currentStep === 2 && (
                 <div className="space-y-6">
                   <PrintConfiguration
+                    key={selectedFile ? selectedFile.name : 'empty'}
                     selectedFile={selectedFile}
                     onConfigChange={handleConfigChange}
-                    initialConfig={printConfig}
+                    initialConfig={currentConfig}
                   />
                 </div>
               )}
@@ -206,23 +248,23 @@ const ModelUpload = () => {
                           <Icon name="Edit" size={16} />
                         </Button>
                       </div>
-                      {printConfig && (
+                      {currentConfig && (
                         <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
                           <div>
                             <p className="text-xs text-muted-foreground">Materiál</p>
-                            <p className="text-sm font-medium text-foreground">{printConfig.material.toUpperCase()}</p>
+                            <p className="text-sm font-medium text-foreground">{currentConfig.material.toUpperCase()}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Kvalita</p>
-                            <p className="text-sm font-medium text-foreground">{printConfig.quality}</p>
+                            <p className="text-sm font-medium text-foreground">{currentConfig.quality}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Množství</p>
-                            <p className="text-sm font-medium text-foreground">{printConfig.quantity} ks</p>
+                            <p className="text-sm font-medium text-foreground">{currentConfig.quantity} ks</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Výplň</p>
-                            <p className="text-sm font-medium text-foreground">{printConfig.infill}%</p>
+                            <p className="text-sm font-medium text-foreground">{currentConfig.infill}%</p>
                           </div>
                         </div>
                       )}
@@ -230,15 +272,17 @@ const ModelUpload = () => {
                   </div>
                 </div>
               )}
-              <PricingCalculator
-                config={printConfig}
-                selectedFile={selectedFile}
-                onPriceChange={handlePriceChange}
-              />
+               {currentStep !== 1 && (
+                <PricingCalculator
+                    config={currentConfig}
+                    selectedFile={selectedFile}
+                    onPriceChange={handlePriceChange}
+                />
+               )}
             </div>
 
             <div className="space-y-6">
-                <ModelViewer selectedFile={selectedFile} onRemove={handleResetUpload} />
+                <ModelViewer selectedFile={selectedFile} onRemove={handleFileDelete} />
                 {uploadedFiles.length > 0 && (
                     <div className="bg-card border border-border rounded-xl p-2">
                         <div className="flex items-center space-x-2">
@@ -246,7 +290,7 @@ const ModelUpload = () => {
                             {uploadedFiles.map((file) => (
                             <Button
                                 key={file.name}
-                                variant={selectedFile === file ? 'default' : 'outline'}
+                                variant={selectedFile && selectedFile.name === file.name ? 'default' : 'outline'}
                                 size="sm"
                                 onClick={() => setSelectedFile(file)}
                                 className="inline-flex"
@@ -255,23 +299,23 @@ const ModelUpload = () => {
                             </Button>
                             ))}
                         </div>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={handleAddModelClick}>
                             <Icon name="Plus" size={16} />
                             <span className="sr-only">Přidání Modelu</span>
                         </Button>
                         </div>
                     </div>
                 )}
-              {pricing && pricing.total > 0 && (
+              {currentPricing && currentPricing.total > 0 && (
                 <div className="bg-card border border-border rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
                     <Icon name="Cpu" size={20} className="mr-2" />
-                    Odhad tisku
+                    Odhad tisku pro {selectedFile.name}
                   </h3>
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between items-center">
                       <p className="text-muted-foreground">Odhadovaná cena</p>
-                      <p className="font-semibold text-primary text-lg">~ {new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0 }).format(pricing.total)}</p>
+                      <p className="font-semibold text-primary text-lg">~ {new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0 }).format(currentPricing.total)}</p>
                     </div>
                   </div>
                 </div>
@@ -279,7 +323,7 @@ const ModelUpload = () => {
               <div className="bg-card border border-border rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Rychlé akce</h3>
                 <div className="space-y-3">
-                  <Button variant="outline" fullWidth iconName="Search" iconPosition="left">
+                  <Button variant="outline" fullWidth iconName="Search" iconPosition="left" onClick={handleProceedToCheckout} disabled={!canProceed() || isProcessing}>
                     Najít tiskárny
                   </Button>
                   <Button variant="ghost" fullWidth iconName="Save" iconPosition="left">
@@ -289,30 +333,6 @@ const ModelUpload = () => {
                     Sdílet model
                   </Button>
                 </div>
-              </div>
-              <div className="bg-muted/30 border border-border rounded-xl p-6">
-                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center">
-                  <Icon name="Lightbulb" size={16} className="mr-2" />
-                  Tipy pro lepší tisk
-                </h4>
-                <ul className="text-xs text-muted-foreground space-y-2">
-                  <li className="flex items-start space-x-2">
-                    <Icon name="Check" size={12} className="text-success mt-0.5 flex-shrink-0" />
-                    <span>Zkontrolujte orientaci modelu pro minimální podpěry</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <Icon name="Check" size={12} className="text-success mt-0.5 flex-shrink-0" />
-                    <span>Zvolte vhodnou výplň podle účelu použití</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <Icon name="Check" size={12} className="text-success mt-0.5 flex-shrink-0" />
-                    <span>Větší modely rozdělte na více částí</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <Icon name="Check" size={12} className="text-success mt-0.5 flex-shrink-0" />
-                    <span>Použijte PLA pro první pokusy</span>
-                  </li>
-                </ul>
               </div>
             </div>
           </div>
@@ -347,7 +367,7 @@ const ModelUpload = () => {
                   iconName="ArrowRight"
                   iconPosition="right"
                 >
-                  {isProcessing ? 'Zpracovávám...' : 'Najít tiskárny'}
+                  {isProcessing ? 'Zpracovávám...' : 'Přejít k výběru tiskárny'}
                 </Button>
               )}
             </div>
