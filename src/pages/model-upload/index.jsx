@@ -238,7 +238,23 @@ const ModelUpload = () => {
             </div>
 
             <div className="space-y-6">
-              <ModelViewer selectedFile={selectedFile} onRemove={handleResetUpload} />
+                <ModelViewer selectedFile={selectedFile} onRemove={handleResetUpload} />
+                {uploadedFiles.length > 0 && (
+                    <div className="bg-card border border-border rounded-xl p-2">
+                        <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="sm" className="flex-grow">
+                            Model 1
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-grow">
+                            Model 2
+                        </Button>
+                        <Button variant="ghost" size="icon">
+                            <Icon name="Plus" size={16} />
+                            <span className="sr-only">Přidání Modelu</span>
+                        </Button>
+                        </div>
+                    </div>
+                )}
               {pricing && pricing.total > 0 && (
                 <div className="bg-card border border-border rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
