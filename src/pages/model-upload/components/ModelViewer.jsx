@@ -148,7 +148,7 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
                 }>
                     {fileUrl && (
                         <Canvas shadows camera={{ position: [0, 0, 150], fov: 50 }}>
-                            <Stage environment="city" intensity={0.6} adjustCamera={1.2}>
+                            <Stage environment="city" intensity={0.6}>
                                 <Center><Model url={fileUrl} /></Center>
                             </Stage>
                             <OrbitControls autoRotate autoRotateSpeed={0.5} />
