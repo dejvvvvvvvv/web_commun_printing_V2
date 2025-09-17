@@ -51,11 +51,11 @@ const ModelUpload = () => {
     }
   }, [uploadedFiles, currentStep]);
 
-  const handleFilesUploaded = (newFiles) => {
-    const newUniqueFiles = newFiles.filter(
-      (newFile) => !uploadedFiles.some((existingFile) => existingFile.name === newFile.name)
-    );
-    setUploadedFiles(prev => [...prev, ...newUniqueFiles]);
+  const handleFilesUploaded = (newFile) => {
+    // Prevent duplicates
+    if (!uploadedFiles.some(file => file.name === newFile.name)) {
+        setUploadedFiles(prev => [...prev, newFile]);
+    }
   };
   
   const handleAddModelClick = () => {
@@ -151,7 +151,19 @@ const ModelUpload = () => {
       <input 
         type="file" 
         ref={fileInputRef} 
-        onChange={(e) => handleFilesUploaded(Array.from(e.target.files))} 
+        onChange={(e) => {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                handleFilesUploaded({
+                    id: Date.now() + Math.random(),
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    file: file,
+                    uploadedAt: new Date()
+                });
+            });
+        }}
         style={{ display: 'none' }} 
         multiple 
         accept=".stl,.obj,.3mf"
@@ -208,7 +220,7 @@ const ModelUpload = () => {
               {currentStep === 1 && (
                 <div className="space-y-6">
                   <FileUploadZone
-                    onFilesUploaded={(files) => handleFilesUploaded(Array.from(files))}
+                    onFilesUploaded={handleFilesUploaded}
                     uploadedFiles={uploadedFiles}
                     onRemoveFile={handleFileDelete}
                   />
