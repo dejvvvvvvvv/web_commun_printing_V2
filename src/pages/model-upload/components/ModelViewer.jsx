@@ -1,6 +1,6 @@
 import React, { Suspense, useMemo, useState, useEffect } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
-import { OrbitControls, Stage, Center } from '@react-three/drei';
+import { OrbitControls, Center, Environment } from '@react-three/drei';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import * as THREE from 'three';
 import Icon from '../../../components/AppIcon';
@@ -127,7 +127,7 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
   
   const handleRemove = () => {
       setIsFullScreen(false);
-      onRemove();
+      onRemove(selectedFile);
   }
 
   return (
@@ -148,9 +148,12 @@ const ModelViewer = ({ selectedFile, onRemove }) => {
                 }>
                     {fileUrl && (
                         <Canvas shadows camera={{ position: [0, 0, 150], fov: 50 }}>
-                            <Stage environment="city" intensity={0.6}>
-                                <Center><Model url={fileUrl} /></Center>
-                            </Stage>
+                            <Environment preset="city" />
+                            <ambientLight intensity={0.7} />
+                            <directionalLight intensity={0.5} position={[10,10,10]} />
+                            <Center>
+                                <Model url={fileUrl} />
+                            </Center>
                             <OrbitControls autoRotate autoRotateSpeed={0.5} />
                         </Canvas>
                     )}
