@@ -1,17 +1,17 @@
 import React from "react";
 import { BrowserRouter, Routes as RouterRoutes, Route } from "react-router-dom";
-import ScrollToTop from "components/ScrollToTop";
-import ErrorBoundary from "components/ErrorBoundary";
-import NotFound from "pages/NotFound";
-import Login from './pages/login';
-import PrinterCatalog from './pages/printer-catalog';
-import HostDashboard from './pages/host-dashboard';
-import ModelUpload from './pages/model-upload';
-import CustomerDashboard from './pages/customer-dashboard';
-import Register from './pages/register';
-import Eshop from './pages/eshop';
-import Orders from './pages/orders';
-import OrderDetails from './pages/orders/details';
+import ScrollToTop from "@/components/ScrollToTop";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import NotFound from "@/pages/NotFound";
+import Login from '@/pages/login';
+import PrinterCatalog from '@/pages/printer-catalog';
+import HostDashboard from '@/pages/host-dashboard';
+import ModelUpload from '@/pages/model-upload';
+import CustomerDashboard from '@/pages/customer-dashboard';
+import Register from '@/pages/register';
+import Eshop from '@/pages/eshop';
+import Orders from '@/pages/orders';
+import OrderDetails from '@/pages/orders/details';
 
 const Routes = () => {
   return (
