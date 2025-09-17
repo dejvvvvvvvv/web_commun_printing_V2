@@ -17,6 +17,7 @@ const ModelUpload = () => {
   const [printConfigs, setPrintConfigs] = useState({});
   const [pricings, setPricings] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isModelListExpanded, setIsModelListExpanded] = useState(false);
 
   const steps = [
     { id: 1, title: 'Nahrání souborů', icon: 'Upload', description: 'Nahrajte 3D modely' },
@@ -296,25 +297,46 @@ const ModelUpload = () => {
             <div className="space-y-6">
                 <ModelViewer selectedFile={selectedFile} onRemove={handleFileDelete} />
                 {uploadedFiles.length > 0 && (
-                    <div className="bg-card border border-border rounded-xl p-2">
-                        <div className="flex items-center space-x-2">
-                        <div className="flex-grow overflow-x-auto whitespace-nowrap space-x-2">
-                            {uploadedFiles.map((file) => (
-                            <Button
-                                key={file.name}
-                                variant={selectedFile && selectedFile.name === file.name ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setSelectedFile(file)}
-                                className="inline-flex"
-                            >
-                                {file.name}
-                            </Button>
-                            ))}
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={handleAddModelClick}>
-                            <Icon name="Plus" size={16} />
-                            <span className="sr-only">Přidání Modelu</span>
-                        </Button>
+                    <div className="relative">
+                        <div className={`bg-card border border-border rounded-xl p-2 transition-all duration-300 ${isModelListExpanded ? 'pb-12' : ''}`}>
+                            <div className={`flex items-center space-x-2 ${isModelListExpanded ? 'flex-wrap gap-2' : 'overflow-x-auto whitespace-nowrap'}`}>
+                                {uploadedFiles.map((file) => (
+                                <Button
+                                    key={file.name}
+                                    variant={selectedFile && selectedFile.name === file.name ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setSelectedFile(file)}
+                                    className={isModelListExpanded ? 'flex-grow' : 'inline-flex'}
+                                >
+                                    {file.name}
+                                </Button>
+                                ))}
+                                {!isModelListExpanded &&
+                                    <div className="flex-grow overflow-x-auto whitespace-nowrap space-x-2">
+                                        {uploadedFiles.map((file) => (
+                                        <Button
+                                            key={file.name}
+                                            variant={selectedFile && selectedFile.name === file.name ? 'default' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setSelectedFile(file)}
+                                            className="inline-flex"
+                                        >
+                                            {file.name}
+                                        </Button>
+                                        ))}
+                                    </div>
+                                }
+                            </div>
+                            <div className="absolute bottom-2 right-2 flex items-center">
+                                <Button variant="ghost" size="icon" onClick={handleAddModelClick}>
+                                    <Icon name="Plus" size={16} />
+                                    <span className="sr-only">Přidání Modelu</span>
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => setIsModelListExpanded(!isModelListExpanded)}>
+                                    <Icon name={isModelListExpanded ? "ChevronsDownUp" : "ChevronsUpDown"} size={16} />
+                                    <span className="sr-only">{isModelListExpanded ? 'Sbalit seznam' : 'Rozbalit seznam'}</span>
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 )}
