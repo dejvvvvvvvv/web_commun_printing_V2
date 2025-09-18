@@ -1,158 +1,130 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from '../../../firebase'; // Import Firebase auth instance
-import Button from '../../../components/ui/Button';
-import Input from '../../../components/ui/Input';
-import { Checkbox } from '../../../components/ui/Checkbox';
-import Icon from '../../../components/AppIcon';
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from '@/firebase';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import { Checkbox } from '@/components/ui/Checkbox';
+import Icon from '@/components/AppIcon';
+import { useTranslation } from 'react-i18next';
+
+const createLoginSchema = (t) => z.object({
+  email: z.string().email(t('loginForm.emailInvalid')),
+  password: z.string().min(1, t('loginForm.passwordRequired')),
+  rememberMe: z.boolean().optional(),
+});
 
 const LoginForm = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    rememberMe: false
+  const loginSchema = createLoginSchema(t);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '', rememberMe: false },
   });
-  const [errors, setErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
 
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData?.email) {
-      newErrors.email = 'Email je povinný';
-    } else if (!/\S+@\S+\.\S+/?.test(formData?.email)) {
-      newErrors.email = 'Neplatný formát emailu';
-    }
-
-    if (!formData?.password) {
-      newErrors.password = 'Heslo je povinné';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors)?.length === 0;
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e?.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-
-    if (errors?.[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-    if (errors.general) {
-        setErrors(prev => ({ ...prev, general: '' }));
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e?.preventDefault();
-    
-    if (!validateForm()) return;
-
-    setIsLoading(true);
-
+  const onSubmit = async (data) => {
     try {
-      // Sign in with Firebase
-      const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
 
-      // TODO: In a real app, you would get the user's role from Firestore or a custom claim
-      // For now, we'll default to 'customer'
-      const userRole = 'customer';
+      // Fetch user role from Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
 
-      // Store user session (in real app, this would be handled by auth context)
-      localStorage.setItem('userRole', userRole);
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userEmail', user.email);
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        const userRole = userData.role || 'customer';
 
-      // Redirect based on user role
-      navigate('/customer-dashboard');
+        // Redirect based on user role
+        if (userRole === 'host') {
+          navigate('/host-dashboard');
+        } else {
+          navigate('/customer-dashboard');
+        }
+      } else {
+        // Fallback if user document doesn't exist
+        console.error("User document not found in Firestore!");
+        navigate('/customer-dashboard'); 
+      }
 
     } catch (error) {
-      let errorMessage = 'Chyba při přihlašování. Zkuste to znovu.';
+      let errorMessage = t('loginForm.genericError');
       switch (error.code) {
         case 'auth/invalid-credential':
         case 'auth/user-not-found':
         case 'auth/wrong-password':
-          errorMessage = 'Neplatná kombinace emailu a hesla.';
+          errorMessage = t('loginForm.invalidCredentials');
           break;
         case 'auth/too-many-requests':
-          errorMessage = 'Příliš mnoho pokusů o přihlášení. Zkuste to prosím později.';
+          errorMessage = t('loginForm.tooManyRequests');
           break;
         default:
           console.error("Firebase login error:", error);
       }
-      setErrors({ general: errorMessage });
-    } finally {
-      setIsLoading(false);
-    }
+      setError('root.serverError', { type: 'manual', message: errorMessage });
+    } 
   };
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Email Input */}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Input
-          label="Email"
+          label={t('loginForm.emailLabel')}
           type="email"
-          name="email"
           placeholder="váš@email.cz"
-          value={formData?.email}
-          onChange={handleInputChange}
-          error={errors?.email}
+          {...register('email')}
+          error={errors.email?.message}
           required
-          disabled={isLoading}
+          disabled={isSubmitting}
         />
 
-        {/* Password Input */}
         <Input
-          label="Heslo"
+          label={t('loginForm.passwordLabel')}
           type="password"
-          name="password"
-          placeholder="Zadejte heslo"
-          value={formData?.password}
-          onChange={handleInputChange}
-          error={errors?.password}
+          placeholder={t('loginForm.passwordPlaceholder')}
+          {...register('password')}
+          error={errors.password?.message}
           required
-          disabled={isLoading}
+          disabled={isSubmitting}
         />
 
-        {/* Remember Me Checkbox */}
         <Checkbox
-          label="Zapamatovat si mě"
-          name="rememberMe"
-          checked={formData?.rememberMe}
-          onChange={handleInputChange}
-          disabled={isLoading}
+          label={t('loginForm.rememberMeLabel')}
+          {...register('rememberMe')}
+          disabled={isSubmitting}
         />
 
-        {/* General Error Message */}
-        {errors?.general && (
+        {errors.root?.serverError && (
           <div className="p-3 bg-error/10 border border-error/20 rounded-lg">
             <p className="text-sm text-error flex items-center space-x-2">
               <Icon name="AlertCircle" size={16} />
-              <span>{errors?.general}</span>
+              <span>{errors.root.serverError.message}</span>
             </p>
           </div>
         )}
 
-        {/* Submit Button */}
         <Button
           type="submit"
           variant="default"
           size="lg"
           fullWidth
-          loading={isLoading}
-          disabled={isLoading}
+          loading={isSubmitting}
+          disabled={isSubmitting}
           iconName="LogIn"
           iconPosition="left"
         >
-          {isLoading ? 'Přihlašování...' : 'Přihlásit se'}
+          {isSubmitting ? t('loginForm.loggingIn') : t('loginForm.loginButton')}
         </Button>
       </form>
     </div>

@@ -6,11 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from '../../../firebase'; 
-import Input from '../../../components/ui/Input';
-import Button from '../../../components/ui/Button';
-import { Checkbox } from '../../../components/ui/Checkbox';
-import Icon from '../../../components/AppIcon';
+import { auth, db } from '@/firebase'; 
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
+import { Checkbox } from '@/components/ui/Checkbox';
+import Icon from '@/components/AppIcon';
 import { useTranslation } from 'react-i18next';
 
 // Funkce pro generování schématu v závislosti na roli a překladové funkci t
@@ -92,7 +92,7 @@ const RegistrationForm = ({ selectedRole }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
 
-      await setDoc(doc(db, "users", user.uid), {
+      const userData = {
         uid: user.uid,
         firstName: data.firstName,
         lastName: data.lastName,
@@ -100,6 +100,7 @@ const RegistrationForm = ({ selectedRole }) => {
         phone: data.phone || '',
         role: selectedRole,
         createdAt: new Date(),
+        // Conditionally add host-specific data
         ...(selectedRole === 'host' && {
           companyName: data.companyName || '',
           businessId: data.businessId || '',
@@ -109,16 +110,25 @@ const RegistrationForm = ({ selectedRole }) => {
             street: data.address,
           },
         })
-      });
+      };
 
-      navigate('/login?status=success');
+      await setDoc(doc(db, "users", user.uid), userData);
+
+      // Navigate to the appropriate dashboard after successful registration
+      if (selectedRole === 'host') {
+        navigate('/host-dashboard');
+      } else {
+        navigate('/customer-dashboard');
+      }
 
     } catch (error) {
       let errorMessage = t('registrationForm.genericError');
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = t('registrationForm.emailInUseError');
+        setError('email', { type: 'manual', message: errorMessage });
+      } else {
+        setError('root.serverError', { type: 'manual', message: errorMessage });
       }
-      setError('root.serverError', { type: 'manual', message: errorMessage });
       console.error("Firebase registration error:", error);
     } finally {
       setIsLoading(false);
@@ -127,7 +137,7 @@ const RegistrationForm = ({ selectedRole }) => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {errors.root?.serverError && <p className="text-red-500">{errors.root.serverError.message}</p>}
+        {errors.root?.serverError && <p className="text-red-500 text-center mb-4">{errors.root.serverError.message}</p>}
 
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-foreground flex items-center space-x-2">
