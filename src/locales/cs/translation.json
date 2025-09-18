@@ -46,5 +46,18 @@
     "confirmEquipmentRequired": "Musíte potvrdit vlastnictví zařízení.",
     "genericError": "Při registraci se vyskytla chyba.",
     "emailInUseError": "Tento e-mail je již používán."
+  },
+  "loginForm": {
+    "emailLabel": "E-mailová adresa",
+    "emailInvalid": "Neplatný formát emailu.",
+    "passwordLabel": "Heslo",
+    "passwordRequired": "Heslo je povinné.",
+    "passwordPlaceholder": "Zadejte heslo",
+    "rememberMeLabel": "Zapamatovat si mě",
+    "loginButton": "Přihlásit se",
+    "loggingIn": "Přihlašování...",
+    "genericError": "Chyba při přihlašování. Zkuste to znovu.",
+    "invalidCredentials": "Neplatná kombinace emailu a hesla.",
+    "tooManyRequests": "Příliš mnoho pokusů o přihlášení. Zkuste to prosím později."
   }
 }
