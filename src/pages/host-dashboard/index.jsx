@@ -1,11 +1,27 @@
 import React from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import WelcomeHeader from '@/components/ui/WelcomeHeader';
+import Header from '@/components/Header';
+import Container from '@/components/Container';
 
 const HostDashboard = () => {
+  const { user } = useAuth();
+
+  if (!user) {
+    return <div>Načítání...</div>;
+  }
+
   return (
-    <div>
-      <h1>Host Dashboard</h1>
-      <p>Welcome to your dashboard. This page is under construction.</p>
-    </div>
+    <>
+      <Header />
+      <Container>
+        <WelcomeHeader 
+          name={user.displayName || 'hostiteli'}
+          subtitle="Vítejte ve svém rozhraní. Zde spravujete svou tiskárnu a objednávky."
+        />
+        {/* Další obsah dashboardu přijde sem */}
+      </Container>
+    </>
   );
 };
 
