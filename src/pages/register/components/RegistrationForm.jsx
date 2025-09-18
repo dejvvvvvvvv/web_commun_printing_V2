@@ -54,7 +54,6 @@ const createRegistrationSchema = (t, role) => {
 const RegistrationForm = ({ selectedRole }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -87,7 +86,6 @@ const RegistrationForm = ({ selectedRole }) => {
 
 
   const onSubmit = async (data) => {
-    setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
@@ -130,8 +128,6 @@ const RegistrationForm = ({ selectedRole }) => {
         setError('root.serverError', { type: 'manual', message: errorMessage });
       }
       console.error("Firebase registration error:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -257,8 +253,8 @@ const RegistrationForm = ({ selectedRole }) => {
       </div>
 
       <div className="pt-4">
-        <Button type="submit" variant="default" size="lg" fullWidth loading={isSubmitting || isLoading} iconName="UserPlus" iconPosition="left">
-          {isSubmitting || isLoading ? t('registrationForm.creatingAccount') : t('registrationForm.createAccountButton')}
+        <Button type="submit" variant="default" size="lg" fullWidth loading={isSubmitting} iconName="UserPlus" iconPosition="left">
+          {isSubmitting ? t('registrationForm.creatingAccount') : t('registrationForm.createAccountButton')}
         </Button>
       </div>
       
