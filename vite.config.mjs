@@ -12,12 +12,6 @@ export default defineConfig({
    chunkSizeWarningLimit: 2000,
   },
   plugins: [tsconfigPaths(), react()],
-  resolve: {
-    alias: {
-      // @ts-ignore
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
-  },
   server: {
     port: "4028",
     host: "0.0.0.0",
