@@ -26,11 +26,11 @@ const Routes = () => {
           <Route path="/register" element={<Register />} />
           <Route path="/printer-catalog" element={<PrinterCatalog />} />
           <Route path="/eshop" element={<Eshop />} />
+          <Route path="/model-upload" element={<ModelUpload />} />
           
           {/* Protected Routes */}
           <Route element={<PrivateRoute />}>
             <Route path="/host-dashboard" element={<HostDashboard />} />
-            <Route path="/model-upload" element={<ModelUpload />} />
             <Route path="/customer-dashboard" element={<CustomerDashboard />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/:id" element={<OrderDetails />} />
