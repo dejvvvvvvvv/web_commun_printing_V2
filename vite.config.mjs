@@ -11,7 +11,21 @@ export default defineConfig({
    outDir: "build",
    chunkSizeWarningLimit: 2000,
   },
-  plugins: [tsconfigPaths(), react()],
+  plugins: [
+    tsconfigPaths(), 
+    react(),
+    // Add this plugin to set the necessary headers for SharedArrayBuffer
+    {
+      name: 'configure-response-headers',
+      configureServer: server => {
+        server.middlewares.use((_req, res, next) => {
+          res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+          res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+          next();
+        });
+      }
+    }
+  ],
   server: {
     port: "4028",
     host: "0.0.0.0",

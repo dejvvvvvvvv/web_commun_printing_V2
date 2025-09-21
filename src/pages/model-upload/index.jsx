@@ -16,13 +16,45 @@ const ModelUpload = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
-  // printConfigs a pricings zustavaji, ale jejich logika se muze v budoucnu zmenit
   const [printConfigs, setPrintConfigs] = useState({});
-  const [pricings, setPricings] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isModelListExpanded, setIsModelListExpanded] = useState(false);
+  const [isEngineReady, setEngineReady] = useState(false);
 
-  // Callback pro aktualizaci stavu modelu ze slicer_integration.js
+  // Dynamicke nacteni Kiri:Moto engine
+  useEffect(() => {
+    const loadScripts = async () => {
+      const loadScript = (src) => new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        script.async = true;
+        document.body.appendChild(script);
+      });
+
+      try {
+        await loadScript('/kiri/kiri.js');
+        await loadScript('/kiri/engine.js');
+        
+        // Inicializace Kiri:Moto
+        window.kiri.init().then(() => {
+            console.log("Kiri:Moto engine is ready.");
+            setEngineReady(true);
+        });
+      } catch (error) {
+        console.error("Failed to load Kiri:Moto scripts:", error);
+      }
+    };
+
+    loadScripts();
+
+    return () => {
+      // Clean up scripts if necessary
+      const scripts = document.querySelectorAll('script[src*="kiri"]');
+      scripts.forEach(s => s.remove());
+    };
+  }, []);
+
   const updateModelStatus = useCallback((modelId, newProps) => {
     setUploadedFiles(prevFiles =>
       prevFiles.map(file =>
@@ -31,10 +63,12 @@ const ModelUpload = () => {
     );
   }, []);
 
-  // Spousteni spravce fronty pri zmene v uploadedFiles
+  // Spousteni spravce fronty
   useEffect(() => {
-    processSlicingQueue(uploadedFiles, updateModelStatus);
-  }, [uploadedFiles, updateModelStatus]);
+    if (isEngineReady) {
+      processSlicingQueue(uploadedFiles, printConfigs, updateModelStatus);
+    }
+  }, [uploadedFiles, printConfigs, isEngineReady, updateModelStatus]);
 
 
   const steps = [
@@ -69,14 +103,20 @@ const ModelUpload = () => {
     }
   }, [uploadedFiles, currentStep]);
 
+  // Re-slicing pri zmene konfigurace
+  useEffect(() => {
+    if (!selectedFile) return;
+    const currentFile = uploadedFiles.find(f => f.id === selectedFile.id);
+    if (currentFile && currentFile.status === 'completed') {
+      updateModelStatus(selectedFile.id, { status: 'pending' });
+    }
+  }, [printConfigs]);
+
   const handleFilesUploaded = (uploadedItem) => {
-    // Ziskani skutecneho File objektu. Argument muze byt bud primo File objekt,
-    // nebo wrapper objekt z FileUploadZone, ktery obsahuje vlastnost 'file'.
     const fileToProcess = uploadedItem.file instanceof File ? uploadedItem.file : uploadedItem;
 
-    // Osetreni, pokud soubor neni validni
     if (!(fileToProcess instanceof File)) {
-        console.error("Pokus o nahrani neplatneho souboru:", uploadedItem);
+        console.error("Attempted to upload an invalid file:", uploadedItem);
         return;
     }
 
@@ -86,7 +126,7 @@ const ModelUpload = () => {
             name: fileToProcess.name,
             size: fileToProcess.size,
             type: fileToProcess.type,
-            file: fileToProcess, // Ulozime cisty File objekt
+            file: fileToProcess,
             fileData: null,
             uploadedAt: new Date(),
             status: 'pending',
@@ -100,11 +140,10 @@ const ModelUpload = () => {
             setUploadedFiles(prev => [...prev, modelObject]);
         };
         reader.onerror = (err) => {
-            console.error("Chyba pri cteni souboru:", err);
-            // Pripadne zde muzeme nastavit stav chyby pro dany model
+            console.error("File reading error:", err);
+            updateModelStatus(modelObject.id, { status: 'failed', error: 'Chyba při čtení souboru.' });
         };
         
-        // Bezpecne cteni cisteho File objektu
         reader.readAsArrayBuffer(fileToProcess);
     }
   };
@@ -117,7 +156,6 @@ const ModelUpload = () => {
     setUploadedFiles([]);
     setSelectedFile(null);
     setPrintConfigs({});
-    setPricings({});
     setCurrentStep(1);
   };
   
@@ -127,12 +165,8 @@ const ModelUpload = () => {
     const newPrintConfigs = { ...printConfigs };
     delete newPrintConfigs[fileToDelete.id];
     
-    const newPricings = { ...pricings };
-    delete newPricings[fileToDelete.id];
-
     setUploadedFiles(newUploadedFiles);
     setPrintConfigs(newPrintConfigs);
-    setPricings(newPricings);
 
     if (selectedFile && selectedFile.id === fileToDelete.id) {
       if (newUploadedFiles.length > 0) {
@@ -146,12 +180,6 @@ const ModelUpload = () => {
   const handleConfigChange = (config) => {
     if (selectedFile) {
       setPrintConfigs(prev => ({ ...prev, [selectedFile.id]: config }));
-    }
-  };
-
-  const handlePriceChange = (newPricing) => {
-    if (selectedFile) {
-      setPricings(prev => ({ ...prev, [selectedFile.id]: newPricing }));
     }
   };
 
@@ -174,14 +202,12 @@ const ModelUpload = () => {
       state: {
         uploadedFiles,
         printConfigs,
-        pricings,
         fromUpload: true
       }
     });
   };
   
   const currentConfig = selectedFile ? printConfigs[selectedFile.id] : null;
-  const currentPricing = selectedFile ? pricings[selectedFile.id] : null;
 
   const canProceed = () => {
     switch (currentStep) {
@@ -190,11 +216,17 @@ const ModelUpload = () => {
       case 2:
         return currentConfig && selectedFile;
       case 3:
-        // Upravit, aby to reflektovalo novou logiku cen
         return uploadedFiles.every(f => f.status === 'completed');
       default:
         return false;
     }
+  };
+
+  const statusTooltips = {
+      pending: "Čeká ve frontě na zpracování",
+      processing: "Zpracovávám...",
+      completed: "Hotovo",
+      failed: "Zpracování se nezdařilo"
   };
 
   return (
@@ -223,11 +255,10 @@ const ModelUpload = () => {
             </div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Nahrání 3D modelu</h1>
             <p className="text-muted-foreground">
-              Nahrajte své 3D modely a nakonfigurujte parametry tisku pro vytvoření objednávky
+              {!isEngineReady ? "Inicializuji výpočetní engine..." : "Nahrajte své 3D modely a nakonfigurujte parametry tisku."}
             </p>
           </div>
 
-          {/* Steps progress bar - beze zmeny */}
           <div className="mb-8">
             <div className="flex items-center justify-between max-w-2xl">
               {steps.map((step, index) => (
@@ -261,14 +292,13 @@ const ModelUpload = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
-                {/* Zjednoduseni - FileUploadZone se zobrazuje stale, pokud nejsou nahrane soubory */}
                 {uploadedFiles.length === 0 && currentStep === 1 && (
                   <FileUploadZone
                     onFilesUploaded={handleFilesUploaded}
+                    disabled={!isEngineReady}
                   />
                 )}
                 
-                {/* Konfigurace a Kontrola se zobrazuji, kdyz jsou soubory nahrany */}
                 {uploadedFiles.length > 0 && (
                     <> 
                         {currentStep === 2 && (
@@ -277,12 +307,12 @@ const ModelUpload = () => {
                                 selectedFile={selectedFile}
                                 onConfigChange={handleConfigChange}
                                 initialConfig={currentConfig}
+                                disabled={!isEngineReady}
                             />
                         )}
                         {currentStep === 3 && (
-                            <div>{/* ... obsah pro krok 3 ... */}</div>
+                            <PricingCalculator selectedFile={selectedFile} />
                         )}
-                        {/* PricingCalculator se presune nebo jeho logika integruje jinak */}
                     </>
                 )}
             </div>
@@ -306,9 +336,10 @@ const ModelUpload = () => {
                                     size="sm"
                                     onClick={() => setSelectedFile(file)}
                                     className="w-full justify-start text-left h-auto py-2 px-3"
+                                    title={statusTooltips[file.status] || 'Neznámý stav'}
                                 >
                                   <div className="flex items-center gap-2">
-                                    {file.status === 'pending' && <Icon name='Clock' size={14} className='animate-spin' />}
+                                    {file.status === 'pending' && <Icon name='Clock' size={14} />}
                                     {file.status === 'processing' && <Icon name='Loader' size={14} className='animate-spin' />}
                                     {file.status === 'completed' && <Icon name='CheckCircle' size={14} className='text-green-500' />}
                                     {file.status === 'failed' && <Icon name='XCircle' size={14} className='text-red-500' />}
@@ -319,13 +350,10 @@ const ModelUpload = () => {
                         </div>
                     </div>
                 )}
-              
-              {/* Zobrazeni ceny a akcni tlacitka - beze zmeny prozatim */}
 
             </div>
           </div>
 
-          {/* Navigacni tlacitka - beze zmeny */}
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
             <Button
               variant="outline"
