@@ -69,28 +69,43 @@ const ModelUpload = () => {
     }
   }, [uploadedFiles, currentStep]);
 
-  const handleFilesUploaded = (newFile) => {
-    if (!uploadedFiles.some(file => file.name === newFile.name)) {
+  const handleFilesUploaded = (uploadedItem) => {
+    // Ziskani skutecneho File objektu. Argument muze byt bud primo File objekt,
+    // nebo wrapper objekt z FileUploadZone, ktery obsahuje vlastnost 'file'.
+    const fileToProcess = uploadedItem.file instanceof File ? uploadedItem.file : uploadedItem;
+
+    // Osetreni, pokud soubor neni validni
+    if (!(fileToProcess instanceof File)) {
+        console.error("Pokus o nahrani neplatneho souboru:", uploadedItem);
+        return;
+    }
+
+    if (!uploadedFiles.some(file => file.name === fileToProcess.name)) {
         const modelObject = {
-            id: Date.now() + Math.random(), // Unikatni ID
-            name: newFile.name,
-            size: newFile.size,
-            type: newFile.type,
-            file: newFile, // Puvodni File objekt pro ModelViewer
-            fileData: null, // Zde bude ArrayBuffer pro slicer
+            id: Date.now() + Math.random(),
+            name: fileToProcess.name,
+            size: fileToProcess.size,
+            type: fileToProcess.type,
+            file: fileToProcess, // Ulozime cisty File objekt
+            fileData: null,
             uploadedAt: new Date(),
-            status: 'pending', // Stavy: pending, processing, completed, failed
-            result: null, // Vysledky ze sliceru
-            error: null, // Pripadna chybova hlaska
+            status: 'pending',
+            result: null,
+            error: null,
         };
 
-        // Nacteni souboru jako ArrayBuffer pro slicer
         const reader = new FileReader();
         reader.onload = (e) => {
             modelObject.fileData = e.target.result;
             setUploadedFiles(prev => [...prev, modelObject]);
         };
-        reader.readAsArrayBuffer(newFile);
+        reader.onerror = (err) => {
+            console.error("Chyba pri cteni souboru:", err);
+            // Pripadne zde muzeme nastavit stav chyby pro dany model
+        };
+        
+        // Bezpecne cteni cisteho File objektu
+        reader.readAsArrayBuffer(fileToProcess);
     }
   };
   
