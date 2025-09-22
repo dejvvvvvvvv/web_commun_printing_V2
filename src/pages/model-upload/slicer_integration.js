@@ -1,17 +1,74 @@
 
 // This file is responsible for interfacing with the Kiri:Moto slicing engine.
 
-let slicingInProgress = false;
+let kiriInstance = null;
+let kiriPromise = null;
 
 /**
- * Creates the necessary device and process profiles for Kiri:Moto.
- * @param {object} config - The print configuration from the UI.
- * @returns {{deviceProfile: object, processProfile: object}}
+ * Loads a script dynamically and returns a promise that resolves when it's loaded.
+ * @param {string} src The source URL of the script.
+ * @returns {Promise<void>}
  */
+const loadScript = (src) => {
+  return new Promise((resolve, reject) => {
+    // Avoid re-injecting the same script
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+    script.async = true;
+    document.body.appendChild(script);
+  });
+};
+
+/**
+ * Initializes and returns a singleton instance of the Kiri:Moto client.
+ * This function ensures that the Kiri:Moto scripts are loaded only once.
+ * @returns {Promise<object>} A promise that resolves with the Kiri:Moto client instance.
+ */
+export const initializeSlicer = () => {
+  if (kiriInstance) {
+    return Promise.resolve(kiriInstance);
+  }
+
+  if (!kiriPromise) {
+    kiriPromise = new Promise(async (resolve, reject) => {
+      try {
+        // Construct absolute paths from the root
+        const baseUrl = import.meta.env.BASE_URL || '/';
+        await loadScript(`${baseUrl}kiri/kiri.js`);
+        await loadScript(`${baseUrl}kiri/engine.js`);
+
+        if (window.kiri && window.kiri.init) {
+          // Kiri:Moto is available, now initialize it
+          window.kiri.init().then((client) => {
+            console.log("Kiri:Moto engine is ready.");
+            kiriInstance = client;
+            resolve(kiriInstance);
+          });
+        } else {
+          throw new Error("kiri object not found on window after loading scripts.");
+        }
+      } catch (error) {
+        console.error("Failed to load or initialize Kiri:Moto:", error);
+        kiriPromise = null; // Reset promise on failure to allow retry
+        reject(error);
+      }
+    });
+  }
+
+  return kiriPromise;
+};
+
+
+let slicingInProgress = false;
+
 const createKiriMotoProfiles = (config) => {
-  // Define a standard device profile (e.g., based on a Prusa i3 MK3)
   const deviceProfile = {
-      // Basic settings
       info: "Prusa i3 MK3",
       max_x: 250,
       max_y: 210,
@@ -19,13 +76,10 @@ const createKiriMotoProfiles = (config) => {
       origin_center: false,
       nozzle_size: 0.4,
       filament_diameter: 1.75,
-
-      // G-code customization
       gcode_header: "G28 ; home all axes\nM107 ; fan off\nG90 ; use absolute coordinates\nM82 ; use absolute distances for extrusion",
       gcode_footer: "M104 S0 ; turn off temperature\nM140 S0 ; turn off heatbed\nM107 ; fan off\nG1 X0 Y200 ; park\nM84 ; disable motors\n; METADATA-START\nGCODE-TIME: {time}\nGCODE-MATL: {material}\n; METADATA-END",
   };
 
-  // Map UI configuration to Kiri:Moto process parameters
   const processProfile = {
       process_name: "Default",
       slice_height: config.quality === 'fast' ? 0.3 : (config.quality === 'fine' ? 0.1 : 0.2),
@@ -33,17 +87,11 @@ const createKiriMotoProfiles = (config) => {
       slice_fill_sparse: config.infill / 100,
       slice_fill_type: "grid",
       slice_support_enable: config.postProcessing.includes('supports'),
-      // Add more mappings as needed
   };
 
   return { deviceProfile, processProfile };
 };
 
-/**
- * Parses the G-code output to extract metadata (time, material).
- * @param {string} gcode - The full G-code as a string.
- * @returns {{time: number, material: number}}
- */
 const parseGcodeResults = (gcode) => {
   const timeMatch = gcode.match(/GCODE-TIME: (\d+\.?\d*)/);
   const materialMatch = gcode.match(/GCODE-MATL: (\d+\.?\d*)/);
@@ -54,21 +102,10 @@ const parseGcodeResults = (gcode) => {
   };
 };
 
-/**
- * Processes a single model file using the Kiri:Moto engine.
- * @param {object} model - The model file object.
- * @param {object} config - The print configuration for this model.
- * @param {function} updateStatus - Callback to update the model's status.
- */
 const processModel = async (model, config, updateStatus) => {
-  if (!window.kiri || !window.kiri.client) {
-    updateStatus(model.id, { status: 'failed', error: 'Slicing engine není připraven.' });
-    return;
-  }
-
   try {
+    const client = await initializeSlicer(); // <-- Changed to initializeSlicer
     const { deviceProfile, processProfile } = createKiriMotoProfiles(config);
-    const { client } = window.kiri;
 
     await client.setMode('FDM');
     await client.setDevice(deviceProfile);
@@ -92,12 +129,6 @@ const processModel = async (model, config, updateStatus) => {
   }
 };
 
-/**
- * Manages the queue of models to be sliced.
- * @param {Array<object>} uploadedFiles - The list of all uploaded files.
- * @param {object} printConfigs - A map of print configurations by model ID.
- * @param {function} updateModelStatus - Callback to update model status in the UI.
- */
 export const processSlicingQueue = async (uploadedFiles, printConfigs, updateModelStatus) => {
   if (slicingInProgress) {
     return;
@@ -109,7 +140,6 @@ export const processSlicingQueue = async (uploadedFiles, printConfigs, updateMod
     slicingInProgress = true;
     const config = printConfigs[modelToProcess.id];
     if (!config) {
-        // Config might not be ready yet, wait for the next cycle
         slicingInProgress = false;
         return;
     }
@@ -118,7 +148,7 @@ export const processSlicingQueue = async (uploadedFiles, printConfigs, updateMod
     await processModel(modelToProcess, config, updateModelStatus);
     slicingInProgress = false;
     
-    // Immediately check for the next model in the queue
-    processSlicingQueue(uploadedFiles, printConfigs, updateModelStatus);
+    // Use a brief timeout to allow the UI to update before processing the next model.
+    setTimeout(() => processSlicingQueue(uploadedFiles, printConfigs, updateModelStatus), 100);
   }
 };

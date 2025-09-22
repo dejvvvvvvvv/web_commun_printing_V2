@@ -8,7 +8,7 @@ import FileUploadZone from './components/FileUploadZone';
 import ModelViewer from './components/ModelViewer';
 import PrintConfiguration from './components/PrintConfiguration';
 import PricingCalculator from './components/PricingCalculator';
-import { processSlicingQueue } from './slicer_integration';
+import { initializeSlicer, processSlicingQueue } from './slicer_integration';
 
 const ModelUpload = () => {
   const navigate = useNavigate();
@@ -20,38 +20,24 @@ const ModelUpload = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEngineReady, setEngineReady] = useState(false);
 
-  // Dynamicke nacteni Kiri:Moto engine
+  // Initialize the slicer engine on component mount
   useEffect(() => {
-    const loadScripts = async () => {
-      const loadScript = (src) => new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = resolve;
-        script.onerror = reject;
-        script.async = true;
-        document.body.appendChild(script);
+    // A flag to prevent state updates if the component is unmounted
+    let isMounted = true;
+
+    initializeSlicer()
+      .then(() => {
+        if (isMounted) {
+          setEngineReady(true);
+        }
+      })
+      .catch(error => {
+        console.error("Failed to initialize slicer engine:", error);
+        // Optionally, show an error message to the user in the UI
       });
 
-      try {
-        await loadScript('/kiri/kiri.js');
-        await loadScript('/kiri/engine.js');
-        
-        // Inicializace Kiri:Moto
-        window.kiri.init().then(() => {
-            console.log("Kiri:Moto engine is ready.");
-            setEngineReady(true);
-        });
-      } catch (error) {
-        console.error("Failed to load Kiri:Moto scripts:", error);
-      }
-    };
-
-    loadScripts();
-
     return () => {
-      // Clean up scripts if necessary
-      const scripts = document.querySelectorAll('script[src*="kiri"]');
-      scripts.forEach(s => s.remove());
+      isMounted = false;
     };
   }, []);
 
@@ -63,13 +49,12 @@ const ModelUpload = () => {
     );
   }, []);
 
-  // Spousteni spravce fronty
+  // Effect to run the slicing queue processor
   useEffect(() => {
     if (isEngineReady) {
       processSlicingQueue(uploadedFiles, printConfigs, updateModelStatus);
     }
   }, [uploadedFiles, printConfigs, isEngineReady, updateModelStatus]);
-
 
   const steps = [
     { id: 1, title: 'Nahrání souborů', icon: 'Upload', description: 'Nahrajte 3D modely' },
@@ -103,14 +88,15 @@ const ModelUpload = () => {
     }
   }, [uploadedFiles, currentStep]);
 
-  // Re-slicing pri zmene konfigurace
+  // Re-slicing logic on configuration change
   useEffect(() => {
-    if (!selectedFile) return;
+    if (!selectedFile || !isEngineReady) return;
     const currentFile = uploadedFiles.find(f => f.id === selectedFile.id);
-    if (currentFile && currentFile.status === 'completed') {
+    // Re-queue for slicing if config changes and the model isn't already pending/processing
+    if (currentFile && (currentFile.status === 'completed' || currentFile.status === 'failed') ) {
       updateModelStatus(selectedFile.id, { status: 'pending' });
     }
-  }, [printConfigs]);
+  }, [printConfigs, selectedFile, isEngineReady, updateModelStatus]);
 
   const handleFilesUploaded = (uploadedItem) => {
     const fileToProcess = uploadedItem.file instanceof File ? uploadedItem.file : uploadedItem;
@@ -129,7 +115,7 @@ const ModelUpload = () => {
             file: fileToProcess,
             fileData: null,
             uploadedAt: new Date(),
-            status: 'pending',
+            status: 'pending', // Start as pending
             result: null,
             error: null,
         };
@@ -169,11 +155,10 @@ const ModelUpload = () => {
     setPrintConfigs(newPrintConfigs);
 
     if (selectedFile && selectedFile.id === fileToDelete.id) {
-      if (newUploadedFiles.length > 0) {
-        setSelectedFile(newUploadedFiles[0]);
-      } else {
+      setSelectedFile(newUploadedFiles.length > 0 ? newUploadedFiles[0] : null);
+    } 
+    if (newUploadedFiles.length === 0) {
         handleResetUpload();
-      }
     }
   };
 
@@ -237,11 +222,12 @@ const ModelUpload = () => {
         ref={fileInputRef} 
         onChange={(e) => {
             const files = Array.from(e.target.files);
-            files.forEach(file => handleFilesUploaded(file));
+            files.forEach(file => handleFilesUploaded({ file }));
         }}
         style={{ display: 'none' }} 
         multiple 
         accept=".stl,.obj,.3mf"
+        disabled={!isEngineReady}
       />
       <div className="pt-16">
         <div className="max-w-7xl mx-auto px-6 py-8">
@@ -301,18 +287,21 @@ const ModelUpload = () => {
                 
                 {uploadedFiles.length > 0 && (
                     <> 
-                        {currentStep === 2 && (
-                            <PrintConfiguration
-                                key={selectedFile ? selectedFile.id : 'empty'}
-                                selectedFile={selectedFile}
-                                onConfigChange={handleConfigChange}
-                                initialConfig={currentConfig}
-                                disabled={!isEngineReady}
-                            />
-                        )}
-                        {currentStep === 3 && (
-                            <PricingCalculator selectedFile={selectedFile} />
-                        )}
+                      <div className={currentStep === 1 || (currentStep === 2 && selectedFile) ? 'block' : 'hidden'}>
+                          <PrintConfiguration
+                              key={selectedFile ? selectedFile.id : 'empty'}
+                              selectedFile={selectedFile}
+                              onConfigChange={handleConfigChange}
+                              initialConfig={currentConfig}
+                              disabled={!isEngineReady || (uploadedFiles.find(f => f.id === (selectedFile?.id))?.status === 'processing')}
+                          />
+                      </div>
+                      {currentStep === 3 && (
+                          <PricingCalculator 
+                            files={uploadedFiles}
+                            configs={printConfigs}
+                          />
+                      )}
                     </>
                 )}
             </div>
@@ -323,7 +312,7 @@ const ModelUpload = () => {
                     <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-4">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="font-semibold">Nahrané modely</h3>
-                             <Button variant="ghost" size="icon" onClick={handleAddModelClick}>
+                             <Button variant="ghost" size="icon" onClick={handleAddModelClick} disabled={!isEngineReady}>
                                 <Icon name="Plus" size={16} />
                                 <span className="sr-only">Přidání Modelu</span>
                             </Button>
@@ -338,12 +327,12 @@ const ModelUpload = () => {
                                     className="w-full justify-start text-left h-auto py-2 px-3"
                                     title={statusTooltips[file.status] || 'Neznámý stav'}
                                 >
-                                  <div className="flex items-center gap-2">
-                                    {file.status === 'pending' && <Icon name='Clock' size={14} />}
-                                    {file.status === 'processing' && <Icon name='Loader' size={14} className='animate-spin' />}
-                                    {file.status === 'completed' && <Icon name='CheckCircle' size={14} className='text-green-500' />}
-                                    {file.status === 'failed' && <Icon name='XCircle' size={14} className='text-red-500' />}
-                                    <span className="truncate">{file.name}</span>
+                                  <div className="flex items-center gap-2 w-full">
+                                    {file.status === 'pending' && <Icon name='Clock' size={14} className='flex-shrink-0' />}
+                                    {file.status === 'processing' && <Icon name='Loader' size={14} className='animate-spin flex-shrink-0' />}
+                                    {file.status === 'completed' && <Icon name='CheckCircle' size={14} className='text-green-500 flex-shrink-0' />}
+                                    {file.status === 'failed' && <Icon name='XCircle' size={14} className='text-red-500 flex-shrink-0' />}
+                                    <span className="truncate flex-grow text-left">{file.name}</span>
                                   </div>
                                 </Button>
                             ))}

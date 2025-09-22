@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { fileURLToPath, URL } from "url";
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -14,22 +14,23 @@ export default defineConfig({
   plugins: [
     tsconfigPaths(), 
     react(),
-    // Add this plugin to set the necessary headers for SharedArrayBuffer
-    {
-      name: 'configure-response-headers',
-      configureServer: server => {
-        server.middlewares.use((_req, res, next) => {
-          res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-          res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-          next();
-        });
-      }
-    }
+    // This plugin copies the Kiri:Moto engine files to the build directory
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'public/kiri/**/*',
+          dest: 'kiri'
+        }
+      ]
+    })
   ],
   server: {
     port: "4028",
     host: "0.0.0.0",
     strictPort: true,
-    allowedHosts: ['.amazonaws.com', '.builtwithrocket.new']
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    }
   }
 });
