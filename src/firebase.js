@@ -6,7 +6,7 @@ import { getStorage } from "firebase/storage";
 import { getAnalytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyBFND2HqRU3b_8c5NlpYVy81qt9dmwApJY",
   authDomain: "communprintingapp-3cfac.firebaseapp.com",
   projectId: "communprintingapp-3cfac",

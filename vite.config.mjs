@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { viteStaticCopy } from 'vite-plugin-static-copy';
+// import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -15,14 +15,14 @@ export default defineConfig({
     tsconfigPaths(), 
     react(),
     // This plugin copies the Kiri:Moto engine files to the build directory
-    viteStaticCopy({
-      targets: [
-        {
-          src: 'public/kiri/**/*',
-          dest: 'kiri'
-        }
-      ]
-    })
+    // viteStaticCopy({
+    //   targets: [
+    //     {
+    //       src: 'public/kiri/**/*',
+    //       dest: 'kiri'
+    //     }
+    //   ]
+    // })
   ],
   server: {
     port: "4028",

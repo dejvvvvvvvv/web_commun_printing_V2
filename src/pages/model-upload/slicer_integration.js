@@ -1,33 +1,28 @@
-
 // This file is responsible for interfacing with the Kiri:Moto slicing engine.
+
+// --- START: Vite-Compatible Inline Script Execution ---
+import kiriCode from '../../lib/kiri/kiri.js?raw';
+import engineCode from '../../lib/kiri/engine.js?raw';
+import workerCode from '../../lib/kiri/kiri_work.js?raw';
+// --- END: Vite-Compatible Inline Script Execution ---
 
 let kiriInstance = null;
 let kiriPromise = null;
 
 /**
- * Loads a script dynamically and returns a promise that resolves when it's loaded.
- * @param {string} src The source URL of the script.
- * @returns {Promise<void>}
+ * Executes a script by injecting its content into a <script> tag.
+ * @param {string} content The raw JavaScript code to execute.
  */
-const loadScript = (src) => {
-  return new Promise((resolve, reject) => {
-    // Avoid re-injecting the same script
-    if (document.querySelector(`script[src="${src}"]`)) {
-      resolve();
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-    script.async = true;
-    document.body.appendChild(script);
-  });
+const executeScript = (content) => {
+  const script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.textContent = content;
+  document.body.appendChild(script);
 };
 
 /**
- * Initializes and returns a singleton instance of the Kiri:Moto client.
- * This function ensures that the Kiri:Moto scripts are loaded only once.
+ * Initializes the Kiri:Moto engine using the "Frankenstein" + "Monkey Patching" method.
+ * This is the definitive, multi-layered solution to prevent all unwanted network requests.
  * @returns {Promise<object>} A promise that resolves with the Kiri:Moto client instance.
  */
 export const initializeSlicer = () => {
@@ -36,26 +31,86 @@ export const initializeSlicer = () => {
   }
 
   if (!kiriPromise) {
-    kiriPromise = new Promise(async (resolve, reject) => {
-      try {
-        // Construct absolute paths from the root
-        const baseUrl = import.meta.env.BASE_URL || '/';
-        await loadScript(`${baseUrl}kiri/kiri.js`);
-        await loadScript(`${baseUrl}kiri/engine.js`);
+    kiriPromise = new Promise((resolve, reject) => {
+      // --- START: MONKEY PATCHING (Layer 1 Defense) ---
+      const originalFetch = window.fetch;
+      let patchIsActive = true;
 
+      const patchedFetch = (url, options) => {
+        if (patchIsActive && typeof url === 'string' && url.endsWith('.json')) {
+          console.warn(`[Monkey Patch] Intercepted and blocked a fetch request to: ${url}`);
+          return Promise.resolve(new Response('{}', {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+        return originalFetch(url, options);
+      };
+
+      window.fetch = patchedFetch;
+      console.log("[Monkey Patch] Global fetch has been temporarily overridden.");
+      // --- END: MONKEY PATCHING ---
+
+      try {
+        // Step 1: Execute scripts on the main thread so window.kiri.init exists.
+        executeScript(kiriCode);
+        executeScript(engineCode);
+
+        // --- START: FRANKENSTEIN METHOD (Layer 2 Defense) ---
+        // Step 2a: Surgically remove the problematic importScripts call from the worker code.
+        const modifiedWorkerCode = workerCode.replace(
+          "importScripts.apply(self, [ app.code.base ]);",
+          "// importScripts.apply(self, [ app.code.base ]); // Patched out by Frankenstein method"
+        );
+
+        // Step 2b: Stitch all scripts together into one self-contained monster script for the worker.
+        const frankensteinCode = kiriCode + '\n' + engineCode + '\n' + modifiedWorkerCode;
+
+        // Step 2c: Create a Blob URL from the new, all-powerful script.
+        const workerBlob = new Blob([frankensteinCode], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(workerBlob);
+        console.log("[Frankenstein] Created a self-contained worker from a Blob URL.");
+        // --- END: FRANKENSTEIN METHOD ---
+
+        // Step 3: Initialize the engine, pointing to our new super-worker.
         if (window.kiri && window.kiri.init) {
-          // Kiri:Moto is available, now initialize it
-          window.kiri.init().then((client) => {
-            console.log("Kiri:Moto engine is ready.");
+          const config = {
+            workerURL: workerUrl,
+            noFetch: true,
+          };
+
+          window.kiri.init(config).then((client) => {
+            // --- FINAL VALIDATION ---
+            if (!client || typeof client.setMode !== 'function') {
+                console.error("FATAL: Kiri:Moto client is invalid or incomplete after init.", client);
+                throw new Error("Kiri:Moto client initialization failed, client is non-functional.");
+            }
+            // --- /FINAL VALIDATION ---
+
+            console.log("SUCCESS: Kiri:Moto engine is ready (initialized via Frankenstein + Monkey Patch).");
             kiriInstance = client;
+
+            window.fetch = originalFetch;
+            patchIsActive = false;
+            console.log("[Monkey Patch] Global fetch has been restored.");
+
             resolve(kiriInstance);
+          }).catch(error => {
+            window.fetch = originalFetch;
+            patchIsActive = false;
+            console.error("[Monkey Patch] Global fetch restored after error.");
+            console.error("FATAL: window.kiri.init() failed.", error);
+            reject(error);
           });
         } else {
-          throw new Error("kiri object not found on window after loading scripts.");
+          throw new Error("FATAL: window.kiri object not found after executing scripts.");
         }
       } catch (error) {
-        console.error("Failed to load or initialize Kiri:Moto:", error);
-        kiriPromise = null; // Reset promise on failure to allow retry
+        window.fetch = originalFetch;
+        patchIsActive = false;
+        console.error("[Monkey Patch] Global fetch restored after catastrophic error.");
+        console.error("FATAL: Slicer initialization failed.", error);
+        kiriPromise = null;
         reject(error);
       }
     });
@@ -63,7 +118,6 @@ export const initializeSlicer = () => {
 
   return kiriPromise;
 };
-
 
 let slicingInProgress = false;
 
@@ -104,13 +158,13 @@ const parseGcodeResults = (gcode) => {
 
 const processModel = async (model, config, updateStatus) => {
   try {
-    const client = await initializeSlicer(); // <-- Changed to initializeSlicer
+    const client = await initializeSlicer();
     const { deviceProfile, processProfile } = createKiriMotoProfiles(config);
 
     await client.setMode('FDM');
     await client.setDevice(deviceProfile);
     await client.setProcess(processProfile);
-    await client.parse(model.fileData); // Pass the ArrayBuffer
+    await client.parse(model.fileData);
     await client.slice();
     await client.prepare();
     const gcode = await client.export();
@@ -148,7 +202,9 @@ export const processSlicingQueue = async (uploadedFiles, printConfigs, updateMod
     await processModel(modelToProcess, config, updateModelStatus);
     slicingInProgress = false;
     
-    // Use a brief timeout to allow the UI to update before processing the next model.
-    setTimeout(() => processSlicingQueue(uploadedFiles, printConfigs, updateModelStatus), 100);
+    // Check for next item in queue without causing a tight loop on failure
+    if (uploadedFiles.some(f => f.status === 'pending')) {
+        setTimeout(() => processSlicingQueue(uploadedFiles, printConfigs, updateModelStatus), 500);
+    }
   }
 };
