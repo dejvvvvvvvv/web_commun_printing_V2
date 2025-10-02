@@ -8,7 +8,28 @@ import FileUploadZone from './components/FileUploadZone';
 import ModelViewer from './components/ModelViewer';
 import PrintConfiguration from './components/PrintConfiguration';
 import PricingCalculator from './components/PricingCalculator';
-import { initializeSlicer, processSlicingQueue } from './slicer_integration';
+import KiriBackgroundPanel from './components/KiriBackgroundPanel.jsx';
+
+// Definice tiskových profilů pro Kiri:Moto
+const createDeviceProfile = () => ({
+  info: "Prusa i3 MK3",
+  max_x: 250,
+  max_y: 210,
+  max_z: 210,
+  origin_center: false,
+  nozzle_size: 0.4,
+  filament_diameter: 1.75,
+});
+
+const createProcessProfile = (config) => ({
+  process_name: "Default",
+  slice_height: config.quality === 'fast' ? 0.3 : (config.quality === 'fine' ? 0.1 : 0.2),
+  slice_shell_count: 2,
+  slice_fill_sparse: config.infill / 100,
+  slice_fill_type: "grid",
+  slice_support_enable: config.postProcessing.includes('supports'),
+});
+
 
 const ModelUpload = () => {
   const navigate = useNavigate();
@@ -18,28 +39,9 @@ const ModelUpload = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [printConfigs, setPrintConfigs] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isEngineReady, setEngineReady] = useState(false);
-
-  // Initialize the slicer engine on component mount
-  useEffect(() => {
-    // A flag to prevent state updates if the component is unmounted
-    let isMounted = true;
-
-    initializeSlicer()
-      .then(() => {
-        if (isMounted) {
-          setEngineReady(true);
-        }
-      })
-      .catch(error => {
-        console.error("Failed to initialize slicer engine:", error);
-        // Optionally, show an error message to the user in the UI
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  
+  // Tento stav určí, který soubor se má právě "slicovat"
+  const [fileToSlice, setFileToSlice] = useState(null);
 
   const updateModelStatus = useCallback((modelId, newProps) => {
     setUploadedFiles(prevFiles =>
@@ -49,12 +51,27 @@ const ModelUpload = () => {
     );
   }, []);
 
-  // Effect to run the slicing queue processor
+  // Callback, který se zavolá po dokončení slicingu
+  const handleSliceComplete = useCallback((results) => {
+    if (!fileToSlice) return;
+
+    const newProps = results.error
+      ? { status: 'failed', error: results.error, result: null }
+      : { status: 'completed', result: results, error: null };
+      
+    updateModelStatus(fileToSlice.id, newProps);
+    setFileToSlice(null); // Uvolníme "slicer" pro další soubor
+  }, [fileToSlice, updateModelStatus]);
+
+  // Efekt, který hledá další soubor k "slicování"
   useEffect(() => {
-    if (isEngineReady) {
-      processSlicingQueue(uploadedFiles, printConfigs, updateModelStatus);
+    if (fileToSlice) return; // Pokud se již něco zpracovává, neděláme nic
+
+    const nextFileToProcess = uploadedFiles.find(f => f.status === 'pending');
+    if (nextFileToProcess) {
+      setFileToSlice(nextFileToProcess);
     }
-  }, [uploadedFiles, printConfigs, isEngineReady, updateModelStatus]);
+  }, [uploadedFiles, fileToSlice]);
 
   const steps = [
     { id: 1, title: 'Nahrání souborů', icon: 'Upload', description: 'Nahrajte 3D modely' },
@@ -88,23 +105,21 @@ const ModelUpload = () => {
     }
   }, [uploadedFiles, currentStep]);
 
-  // Re-slicing logic on configuration change
-  useEffect(() => {
-    if (!selectedFile || !isEngineReady) return;
-    const currentFile = uploadedFiles.find(f => f.id === selectedFile.id);
-    // Re-queue for slicing if config changes and the model isn't already pending/processing
-    if (currentFile && (currentFile.status === 'completed' || currentFile.status === 'failed') ) {
-      updateModelStatus(selectedFile.id, { status: 'pending' });
+  // Logika pro znovuspuštění slicingu při změně konfigurace
+  const handleConfigChange = (config) => {
+    if (selectedFile) {
+      setPrintConfigs(prev => ({ ...prev, [selectedFile.id]: config }));
+      // Pokud se změní konfigurace, přepneme stav na 'pending', aby se spustil nový slicing
+      const currentFile = uploadedFiles.find(f => f.id === selectedFile.id);
+      if (currentFile && currentFile.status !== 'processing') {
+        updateModelStatus(selectedFile.id, { status: 'pending' });
+      }
     }
-  }, [printConfigs, selectedFile, isEngineReady, updateModelStatus]);
+  };
 
   const handleFilesUploaded = (uploadedItem) => {
     const fileToProcess = uploadedItem.file instanceof File ? uploadedItem.file : uploadedItem;
-
-    if (!(fileToProcess instanceof File)) {
-        console.error("Attempted to upload an invalid file:", uploadedItem);
-        return;
-    }
+    if (!(fileToProcess instanceof File)) return;
 
     if (!uploadedFiles.some(file => file.name === fileToProcess.name)) {
         const modelObject = {
@@ -112,42 +127,28 @@ const ModelUpload = () => {
             name: fileToProcess.name,
             size: fileToProcess.size,
             type: fileToProcess.type,
-            file: fileToProcess,
-            fileData: null,
+            file: fileToProcess, // Uchováme objekt File pro KiriPanel
             uploadedAt: new Date(),
-            status: 'pending', // Start as pending
+            status: 'pending', // Nový soubor vždy začíná jako 'pending'
             result: null,
             error: null,
         };
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            modelObject.fileData = e.target.result;
-            setUploadedFiles(prev => [...prev, modelObject]);
-        };
-        reader.onerror = (err) => {
-            console.error("File reading error:", err);
-            updateModelStatus(modelObject.id, { status: 'failed', error: 'Chyba při čtení souboru.' });
-        };
-        
-        reader.readAsArrayBuffer(fileToProcess);
+        setUploadedFiles(prev => [...prev, modelObject]);
     }
   };
   
-  const handleAddModelClick = () => {
-    fileInputRef.current.click();
-  };
+  const handleAddModelClick = () => fileInputRef.current.click();
 
   const handleResetUpload = () => {
     setUploadedFiles([]);
     setSelectedFile(null);
     setPrintConfigs({});
     setCurrentStep(1);
+    setFileToSlice(null);
   };
   
   const handleFileDelete = (fileToDelete) => {
     const newUploadedFiles = uploadedFiles.filter(file => file.id !== fileToDelete.id);
-    
     const newPrintConfigs = { ...printConfigs };
     delete newPrintConfigs[fileToDelete.id];
     
@@ -156,54 +157,36 @@ const ModelUpload = () => {
 
     if (selectedFile && selectedFile.id === fileToDelete.id) {
       setSelectedFile(newUploadedFiles.length > 0 ? newUploadedFiles[0] : null);
-    } 
+    }
     if (newUploadedFiles.length === 0) {
         handleResetUpload();
     }
   };
 
-  const handleConfigChange = (config) => {
-    if (selectedFile) {
-      setPrintConfigs(prev => ({ ...prev, [selectedFile.id]: config }));
-    }
-  };
-
   const handleNextStep = () => {
-    if (currentStep < 3) {
-      setCurrentStep(currentStep + 1);
-    }
+    if (currentStep < 3) setCurrentStep(currentStep + 1);
   };
 
   const handlePrevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
+    if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
   const handleProceedToCheckout = async () => {
     setIsProcessing(true);
     await new Promise(resolve => setTimeout(resolve, 2000));
     navigate('/printer-catalog', {
-      state: {
-        uploadedFiles,
-        printConfigs,
-        fromUpload: true
-      }
+      state: { uploadedFiles, printConfigs, fromUpload: true }
     });
   };
   
-  const currentConfig = selectedFile ? printConfigs[selectedFile.id] : null;
-
+  const currentConfig = selectedFile ? printConfigs[selectedFile.id] : {};
+  
   const canProceed = () => {
     switch (currentStep) {
-      case 1:
-        return uploadedFiles.length > 0;
-      case 2:
-        return currentConfig && selectedFile;
-      case 3:
-        return uploadedFiles.every(f => f.status === 'completed');
-      default:
-        return false;
+      case 1: return uploadedFiles.length > 0;
+      case 2: return !!currentConfig && !!selectedFile;
+      case 3: return uploadedFiles.every(f => f.status === 'completed');
+      default: return false;
     }
   };
 
@@ -217,6 +200,16 @@ const ModelUpload = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      {/* Skrytý panel, který se stará o slicing na pozadí */}
+      {fileToSlice && currentConfig && (
+        <KiriBackgroundPanel
+          fileToSlice={fileToSlice.file}
+          onSliceComplete={handleSliceComplete}
+          device={createDeviceProfile()}
+          process={createProcessProfile(currentConfig)}
+        />
+      )}
+
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -227,7 +220,6 @@ const ModelUpload = () => {
         style={{ display: 'none' }} 
         multiple 
         accept=".stl,.obj,.3mf"
-        disabled={!isEngineReady}
       />
       <div className="pt-16">
         <div className="max-w-7xl mx-auto px-6 py-8">
@@ -241,7 +233,7 @@ const ModelUpload = () => {
             </div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Nahrání 3D modelu</h1>
             <p className="text-muted-foreground">
-              {!isEngineReady ? "Inicializuji výpočetní engine..." : "Nahrajte své 3D modely a nakonfigurujte parametry tisku."}
+              Nahrajte své 3D modely a nakonfigurujte parametry tisku.
             </p>
           </div>
 
@@ -279,10 +271,7 @@ const ModelUpload = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
                 {uploadedFiles.length === 0 && currentStep === 1 && (
-                  <FileUploadZone
-                    onFilesUploaded={handleFilesUploaded}
-                    disabled={!isEngineReady}
-                  />
+                  <FileUploadZone onFilesUploaded={handleFilesUploaded} />
                 )}
                 
                 {uploadedFiles.length > 0 && (
@@ -293,7 +282,7 @@ const ModelUpload = () => {
                               selectedFile={selectedFile}
                               onConfigChange={handleConfigChange}
                               initialConfig={currentConfig}
-                              disabled={!isEngineReady || (uploadedFiles.find(f => f.id === (selectedFile?.id))?.status === 'processing')}
+                              disabled={fileToSlice?.id === selectedFile?.id}
                           />
                       </div>
                       {currentStep === 3 && (
@@ -312,7 +301,7 @@ const ModelUpload = () => {
                     <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-4">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="font-semibold">Nahrané modely</h3>
-                             <Button variant="ghost" size="icon" onClick={handleAddModelClick} disabled={!isEngineReady}>
+                             <Button variant="ghost" size="icon" onClick={handleAddModelClick}>
                                 <Icon name="Plus" size={16} />
                                 <span className="sr-only">Přidání Modelu</span>
                             </Button>
@@ -328,8 +317,8 @@ const ModelUpload = () => {
                                     title={statusTooltips[file.status] || 'Neznámý stav'}
                                 >
                                   <div className="flex items-center gap-2 w-full">
-                                    {file.status === 'pending' && <Icon name='Clock' size={14} className='flex-shrink-0' />}
-                                    {file.status === 'processing' && <Icon name='Loader' size={14} className='animate-spin flex-shrink-0' />}
+                                    {fileToSlice?.id === file.id && <Icon name='Loader' size={14} className='animate-spin flex-shrink-0' />}
+                                    {file.status === 'pending' && fileToSlice?.id !== file.id && <Icon name='Clock' size={14} className='flex-shrink-0' />}
                                     {file.status === 'completed' && <Icon name='CheckCircle' size={14} className='text-green-500 flex-shrink-0' />}
                                     {file.status === 'failed' && <Icon name='XCircle' size={14} className='text-red-500 flex-shrink-0' />}
                                     <span className="truncate flex-grow text-left">{file.name}</span>
@@ -339,7 +328,6 @@ const ModelUpload = () => {
                         </div>
                     </div>
                 )}
-
             </div>
           </div>
 
