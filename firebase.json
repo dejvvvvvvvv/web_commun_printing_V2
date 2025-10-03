@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "build",
+    "public": "dist",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -16,20 +16,14 @@
       {
         "source": "**",
         "headers": [
+          { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+          { "key": "Cross-Origin-Embedder-Policy", "value": "credentialless" },
           {
-            "key": "Cross-Origin-Opener-Policy",
-            "value": "same-origin"
-          },
-          {
-            "key": "Cross-Origin-Embedder-Policy",
-            "value": "require-corp"
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self' https://grid.space; worker-src 'self' blob: https://grid.space; connect-src 'self' https://grid.space; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;"
           }
         ]
       }
     ]
-  },
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
   }
 }
