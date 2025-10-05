@@ -1,50 +1,47 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+// AuthContext.jsx
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
-const AuthContext = createContext();
+const AuthContext = createContext({ user: null, loading: true });
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
-
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // subscribe na změny auth stavu
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // User is signed in, see docs for a list of available properties
-        // https://firebase.google.com/docs/reference/js/firebase.User
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          setCurrentUser({ ...user, ...userDocSnap.data() });
+      try {
+        if (user) {
+          const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+          setCurrentUser(userDocSnap.exists()
+            ? { ...user, ...userDocSnap.data() }
+            : user
+          );
         } else {
-          // This case might happen if a user is in auth but not in firestore. 
-          // For now, we'll just set the basic user object.
-          setCurrentUser(user);
+          setCurrentUser(null);
         }
-      } else {
-        // User is signed out
-        setCurrentUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return unsubscribe;
-  }, []);
+    // cleanup při unmountu
+    return () => unsubscribe();
+  }, []); // důležité: jen jednou po mountu
 
-  const value = {
-    currentUser,
-    loading,
-  };
+  const value = useMemo(() => ({ user: currentUser, loading }), [currentUser, loading]);
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
-};
+}
+
+// pohodlný hook
+export function useAuth() {
+  return useContext(AuthContext);
+}
