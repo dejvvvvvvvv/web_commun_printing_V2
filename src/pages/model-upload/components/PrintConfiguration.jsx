@@ -120,7 +120,7 @@ const PrintConfiguration = ({ onConfigChange, selectedFile, initialConfig, disab
                 <Checkbox
                   id={`post-${option.id}`}
                   checked={config.postProcessing?.includes(option.id) ?? false}
-                  onCheckedChange={(checked) => handlePostProcessingChange(option.id, checked)}
+                  onChange={(e) => handlePostProcessingChange(option.id, e.target.checked)}
                 />
                 <div>
                   <p className="text-sm font-medium text-foreground">{option.label}</p>

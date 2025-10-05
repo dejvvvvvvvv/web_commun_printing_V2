@@ -1,10 +1,17 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
-const FileUploadZone = ({ onFilesUploaded, uploadedFiles, onRemoveFile }) => {
+const FileUploadZone = ({ onFilesChange, uploadedFiles, onRemoveFile }) => {
   const [uploadProgress, setUploadProgress] = useState({});
+  const [internalFiles, setInternalFiles] = useState([]);
+
+  useEffect(() => {
+    if (onFilesChange) {
+      onFilesChange(internalFiles);
+    }
+  }, [internalFiles, onFilesChange]);
 
   const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
     // Handle rejected files
@@ -27,14 +34,14 @@ const FileUploadZone = ({ onFilesUploaded, uploadedFiles, onRemoveFile }) => {
           if (currentProgress >= 100) {
             clearInterval(interval);
             // Add file to uploaded files list
-            onFilesUploaded({
+            setInternalFiles(prevFiles => [...prevFiles, {
               id: fileId,
               name: file?.name,
               size: file?.size,
               type: file?.type,
               file: file,
               uploadedAt: new Date()
-            });
+            }]);
             // Remove from progress tracking
             const newProgress = { ...prev };
             delete newProgress?.[fileId];
@@ -44,7 +51,7 @@ const FileUploadZone = ({ onFilesUploaded, uploadedFiles, onRemoveFile }) => {
         });
       }, 200);
     });
-  }, [onFilesUploaded]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

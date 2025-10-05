@@ -78,8 +78,24 @@ const ModelInfo = ({ file }) => {
 
 // 3. FullScreen Modal
 const FullScreenViewer = ({ fileUrl, onClose }) => {
+    useEffect(() => {
+        return () => {
+            // Pokus o uvolnění WebGL kontextu při odmountování
+            try {
+                const canvas = document.querySelector(".fullscreen-canvas canvas");
+                const gl = canvas?.getContext('webgl') || canvas?.getContext('experimental-webgl');
+                if (gl) {
+                    const loseContext = gl.getExtension('WEBGL_lose_context');
+                    if (loseContext) {
+                        loseContext.loseContext();
+                    }
+                }
+            } catch {}
+        };
+    }, []);
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm fullscreen-canvas" onClick={onClose}>
             <div className="relative w-[90vw] h-[90vh] bg-transparent" onClick={(e) => e.stopPropagation()}>
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 pt-2">
                     <Button
