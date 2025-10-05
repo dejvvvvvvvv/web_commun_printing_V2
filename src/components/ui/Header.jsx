@@ -173,12 +173,12 @@ const Header = () => {
               </Button>
 
               <div className="flex items-center justify-between px-4 py-2">
-                <div className="flex items-center space-x-3">
+                <button className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                     <Icon name="User" size={16} />
                   </div>
                   <span className="text-sm font-medium">Account</span>
-                </div>
+                </button>
                 <button
                   onClick={handleNotificationClick}
                   className="relative p-2 text-muted-foreground hover:text-foreground transition-micro rounded-lg hover:bg-muted"
