@@ -1,13 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../firebase';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
   const [userRole, setUserRole] = useState('customer'); // 'customer' or 'host'
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const toggleBtnRef = useRef(null);
   const location = useLocation();
+
+  // zavřít dropdown při kliknutí mimo
+  useEffect(() => {
+    function onDocClick(e) {
+      if (!userMenuOpen) return;
+      const el = e.target;
+      if (menuRef.current?.contains(el)) return;
+      if (toggleBtnRef.current?.contains(el)) return;
+      setUserMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [userMenuOpen]);
+
+  // zavřít dropdown při změně trasy
+  useEffect(() => {
+    if (userMenuOpen) setUserMenuOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const handleToggleUserMenu = () => setUserMenuOpen(v => !v);
+
+  async function handleSignOut() {
+    try {
+      await signOut(auth);
+      window.location.href = '/login';
+    } catch (e) {
+      console.error('Sign out failed:', e);
+      alert('Nepodařilo se odhlásit. Zkuste to prosím znovu.');
+    }
+  }
+
+  const isLoggedIn = !!auth.currentUser;
+
 
   // Mock user role detection - in real app, this would come from auth context
   useEffect(() => {
@@ -111,15 +150,82 @@ const Header = () => {
               )}
             </button>
 
-            {/* User Menu */}
-            <Link to="/account" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                <Icon name="User" size={16} />
-              </div>
-              <button className="text-muted-foreground hover:text-foreground transition-micro">
+            {/* User Menu (split: Link + Button) */}
+            <div className="relative flex items-center gap-1">
+              {/* Link na účet = ikona + text */}
+              <Link
+                to="/account"
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-muted transition"
+              >
+                <span className="w-8 h-8 bg-muted rounded-full inline-flex items-center justify-center">
+                  <Icon name="User" size={16} />
+                </span>
+                <span className="text-sm font-medium">Účet</span>
+              </Link>
+
+              {/* Chevron = samostatné tlačítko pro otevření dropdownu */}
+              <button
+                ref={toggleBtnRef}
+                type="button"
+                onClick={handleToggleUserMenu}
+                className="inline-flex items-center rounded-lg p-2 hover:bg-muted text-muted-foreground hover:text-foreground transition-micro"
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
+                aria-controls="user-menu"
+                aria-label="Otevřít uživatelské menu"
+              >
                 <Icon name="ChevronDown" size={16} />
               </button>
-            </Link>
+
+              {/* Dropdown */}
+              {userMenuOpen && (
+                <div
+                  id="user-menu"
+                  ref={menuRef}
+                  role="menu"
+                  className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-border bg-popover text-popover-foreground shadow-card overflow-hidden z-50"
+                >
+                  {isLoggedIn ? (
+                    <div className="py-1">
+                      <Link
+                        to="/account"
+                        role="menuitem"
+                        className="block w-full text-left px-4 py-2 text-sm hover:bg-muted"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Účet
+                      </Link>
+                      <button
+                        role="menuitem"
+                        className="block w-full text-left px-4 py-2 text-sm hover:bg-muted"
+                        onClick={handleSignOut}
+                      >
+                        Odhlásit se
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="py-1">
+                      <Link
+                        to="/login"
+                        role="menuitem"
+                        className="block w-full text-left px-4 py-2 text-sm hover:bg-muted"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Přihlásit
+                      </Link>
+                      <Link
+                        to="/register"
+                        role="menuitem"
+                        className="block w-full text-left px-4 py-2 text-sm hover:bg-muted"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Registrovat
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Mobile Menu Button */}
