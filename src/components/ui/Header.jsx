@@ -112,14 +112,14 @@ const Header = () => {
             </button>
 
             {/* User Menu */}
-            <div className="flex items-center space-x-2">
+            <Link to="/account" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                 <Icon name="User" size={16} />
               </div>
               <button className="text-muted-foreground hover:text-foreground transition-micro">
                 <Icon name="ChevronDown" size={16} />
               </button>
-            </div>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -173,12 +173,12 @@ const Header = () => {
               </Button>
 
               <div className="flex items-center justify-between px-4 py-2">
-                <button className="flex items-center space-x-3">
+                <Link to="/account" className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                     <Icon name="User" size={16} />
                   </div>
-                  <span className="text-sm font-medium">Account</span>
-                </button>
+                  <span className="text-sm font-medium">Účet</span>
+                </Link>
                 <button
                   onClick={handleNotificationClick}
                   className="relative p-2 text-muted-foreground hover:text-foreground transition-micro rounded-lg hover:bg-muted"

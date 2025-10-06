@@ -13,6 +13,7 @@ import Register from '@/pages/register';
 import Eshop from '@/pages/eshop';
 import Orders from '@/pages/orders';
 import OrderDetails from '@/pages/orders/details';
+import Account from './pages/account';
 
 const Routes = () => {
   return (
@@ -34,6 +35,7 @@ const Routes = () => {
             <Route path="/customer-dashboard" element={<CustomerDashboard />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/:id" element={<OrderDetails />} />
+            <Route path="/account" element={<Account />} />
           </Route>
 
           {/* Not Found Route */}
