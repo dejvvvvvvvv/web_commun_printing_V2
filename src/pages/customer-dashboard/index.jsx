@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import WelcomeHeader from '@/components/ui/WelcomeHeader';
-import Header from '@/components/ui/Header';
 import Container from '@/components/ui/Container';
 
 const CustomerDashboard = () => {
@@ -13,7 +12,6 @@ const CustomerDashboard = () => {
 
   return (
     <>
-      <Header />
       <Container>
         <WelcomeHeader 
           name={user.displayName || 'zákazníku'}

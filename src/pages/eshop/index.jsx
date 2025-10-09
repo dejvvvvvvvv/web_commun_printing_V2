@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Header from '../../components/ui/Header';
 import Icon from '../../components/AppIcon';
 
 const Eshop = () => {
@@ -50,8 +49,7 @@ const Eshop = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <div className="pt-16">
+      <div>
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">E-shop</h1>

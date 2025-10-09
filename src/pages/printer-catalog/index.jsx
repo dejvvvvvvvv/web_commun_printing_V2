@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs } from "firebase/firestore";
 import { db } from '../../firebase'; // Import Firestore instance
-import Header from '../../components/ui/Header';
 import FilterPanel from './components/FilterPanel';
 import SortControls from './components/SortControls';
 import PrinterCard from './components/PrinterCard';
@@ -137,8 +136,7 @@ const PrinterCatalog = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <div className="pt-16">
+      <div>
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8">
              <h1 className="text-3xl font-bold text-foreground mb-2">Katalog 3D tiskáren</h1>

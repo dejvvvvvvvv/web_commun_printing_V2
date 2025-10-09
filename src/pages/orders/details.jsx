@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Header from '../../components/ui/Header';
 import Icon from '../../components/AppIcon';
 
 const OrderDetails = () => {
@@ -30,8 +29,7 @@ const OrderDetails = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <div className="pt-16">
+      <div>
         <div className="max-w-7xl mx-auto px-6 py-8">
             <button onClick={() => navigate('/orders')} className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground mb-4">
                 <Icon name="ChevronLeft" size={16} />

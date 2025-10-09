@@ -1,9 +1,15 @@
-import React from "react";
-import Routes from "./Routes";
+import React from 'react';
+import Routes from './Routes';
+import Header from './components/ui/Header';
 
 function App() {
   return (
-    <Routes />
+    <>
+      <Header />
+      <main className="pt-16">
+        <Routes />
+      </main>
+    </>
   );
 }
 

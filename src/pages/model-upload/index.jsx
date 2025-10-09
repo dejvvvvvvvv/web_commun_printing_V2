@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
-import Header from '../../components/ui/Header';
 import FileUploadZone from './components/FileUploadZone';
 import ModelViewer from './components/ModelViewer';
 import PrintConfiguration from './components/PrintConfiguration';
@@ -199,7 +198,6 @@ const ModelUpload = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       {/* Skrytý panel, který se stará o slicing na pozadí */}
       {fileToSlice && currentConfig && (
         <KiriBackgroundPanel
@@ -221,7 +219,7 @@ const ModelUpload = () => {
         multiple 
         accept=".stl,.obj,.3mf"
       />
-      <div className="pt-16">
+      <div>
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8">
             <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-2">
