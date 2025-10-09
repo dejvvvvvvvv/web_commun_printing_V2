@@ -1,142 +1,118 @@
-// src/pages/account/Account.jsx
-import React, { useState } from 'react';
-import Header from '../../components/ui/Header'; // ⬅️ přidáno
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { sendEmailVerification, signOut } from 'firebase/auth';
 import { useAuth } from '../../context/AuthContext';
-import { sendEmailVerification, sendPasswordResetEmail, signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
 
-export default function Account() {
-  const { currentUser } = useAuth();
-  const [sendingVerify, setSendingVerify] = useState(false);
-  const [sendingReset, setSendingReset] = useState(false);
-  const [info, setInfo] = useState(null);
-  const [err, setErr] = useState(null);
+export default function AccountPage() {
+  const { currentUser, loading } = useAuth();
 
-  if (!currentUser) {
-    // bezpečnostní pojistka, PrivateRoute by stejně přesměroval
-    return null;
+  // 1) Loading state -> nikdy nevracíme null, aby nebyla bílá stránka
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-6">
+        <div className="h-28 rounded-2xl bg-muted animate-pulse" />
+      </div>
+    );
   }
 
-  const handleSendVerify = async () => {
-    try {
-      setErr(null); setInfo(null); setSendingVerify(true);
-      await sendEmailVerification(auth.currentUser);
-      setInfo('Ověřovací e-mail byl odeslán.');
-    } catch (e) {
-      setErr(e.message || String(e));
-    } finally {
-      setSendingVerify(false);
-    }
-  };
+  // 2) Nepřihlášený uživatel -> přesměrujeme na login
+  if (!currentUser) {
+    return <Navigate to="/login" replace state={{ from: '/account' }} />;
+  }
 
-  const handlePasswordReset = async () => {
-    try {
-      setErr(null); setInfo(null); setSendingReset(true);
-      await sendPasswordResetEmail(auth, currentUser.email);
-      setInfo('Na váš e-mail jsme poslali odkaz pro změnu hesla.');
-    } catch (e) {
-      setErr(e.message || String(e));
-    } finally {
-      setSendingReset(false);
-    }
-  };
+  const displayName =
+    currentUser.displayName ||
+    (currentUser.email ? currentUser.email.split('@')[0] : 'Uživatel');
 
-  // "Odhlásit na všech zařízeních" – z frontendu spolehlivě odhlásíme aktuální session.
-  // (Skutečné "na všech" vyžaduje Cloud Function s Admin SDK pro revokeTokens – přidáme v další fázi.)
-  const handleSignOutEverywhere = async () => {
+  const lastSignIn =
+    currentUser?.metadata?.lastSignInTime
+      ? new Date(currentUser.metadata.lastSignInTime).toLocaleString()
+      : null;
+
+  const emailVerified = Boolean(currentUser.emailVerified);
+
+  async function handleSendVerify() {
     try {
-      setErr(null); setInfo(null);
+      await sendEmailVerification(currentUser);
+      alert('Ověřovací e-mail byl odeslán.');
+    } catch (err) {
+      console.error(err);
+      alert('Odeslání ověřovacího e-mailu se nepodařilo.');
+    }
+  }
+
+  async function handleSignOutEverywhere() {
+    // Pozn.: “odhlásit všude” vyžaduje server/admin (revokeRefreshTokens).
+    // Na klientu korektně odhlásíme aktuální zařízení:
+    try {
       await signOut(auth);
-      // po signOut tě PrivateRoute přesměruje na /login
-    } catch (e) {
-      setErr(e.message || String(e));
+    } catch (err) {
+      console.error(err);
+      alert('Odhlášení se nepovedlo.');
     }
-  };
-
-  const lastSignIn = auth.currentUser?.metadata?.lastSignInTime;
+  }
 
   return (
-    <>
-      {/* ⬇️ sjednocené horní menu jako na ostatních stránkách */}
-      <Header />
-
-      {/* obsah stránky v kontejneru jako jinde */}
-      <main className="container mx-auto max-w-6xl px-4 py-6">
-        <h1 className="text-2xl font-semibold mb-4">Účet</h1>
-
-        <section className="rounded-2xl border bg-card text-card-foreground p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-4">
-              {/* Avatar s iniciálou */}
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-lg font-medium">
-                {(currentUser.displayName?.[0] || currentUser.email?.[0] || 'U').toUpperCase()}
-              </div>
-              <div>
-                <div className="text-lg font-medium">
-                  {currentUser.displayName || 'Uživatel'}
-                </div>
-                <div className="text-sm text-muted-foreground">{currentUser.email}</div>
-
-                <div className="mt-2 flex items-center gap-2">
-                  {currentUser.emailVerified ? (
-                    <span className="inline-flex items-center px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">
-                      E-mail ověřen
-                    </span>
-                  ) : (
-                    <>
-                      <span className="inline-flex items-center px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">
-                        E-mail neověřen
-                      </span>
-                      <button
-                        disabled={sendingVerify}
-                        onClick={handleSendVerify}
-                        className="inline-flex items-center px-3 py-1 rounded-md border bg-foreground text-background text-xs hover:opacity-90 disabled:opacity-60"
-                      >
-                        {sendingVerify ? 'Posílám…' : 'Poslat ověřovací e-mail'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {lastSignIn && (
-              <div className="text-xs text-muted-foreground">
-                Poslední přihlášení: {lastSignIn}
-              </div>
+    <div className="container mx-auto px-4 py-6">
+      {/* “Hero” karta účtu */}
+      <div className="rounded-2xl border bg-card text-card-foreground p-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        {/* Vlevo: avatar + jméno + email + badge */}
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-lg font-semibold">
+            {displayName?.[0]?.toUpperCase() || 'U'}
+          </div>
+          <div>
+            <div className="text-xl font-semibold leading-tight">{displayName}</div>
+            {currentUser.email && (
+              <div className="text-sm text-muted-foreground">{currentUser.email}</div>
             )}
-          </div>
-
-          {/* Rychlé akce */}
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button className="px-4 py-2 rounded-md border hover:bg-muted">
-              Upravit profil
-            </button>
-            <button
-              onClick={handlePasswordReset}
-              disabled={sendingReset}
-              className="px-4 py-2 rounded-md border hover:bg-muted disabled:opacity-60"
-            >
-              {sendingReset ? 'Odesílám…' : 'Změnit heslo'}
-            </button>
-            <button
-              onClick={handleSignOutEverywhere}
-              className="px-4 py-2 rounded-md border hover:bg-muted"
-              title="Pro úplné odhlášení 'na všech' přidáme serverové odvolání tokenů."
-            >
-              Odhlásit na všech zařízeních
-            </button>
-          </div>
-
-          {/* Hlášky */}
-          {(info || err) && (
-            <div className="mt-4 text-sm">
-              {info && <div className="text-green-700">{info}</div>}
-              {err && <div className="text-red-600">{err}</div>}
+            <div className="mt-2 flex items-center gap-2">
+              <span
+                className={
+                  'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ' +
+                  (emailVerified
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-amber-100 text-amber-700')
+                }
+              >
+                {emailVerified ? 'E-mail ověřen' : 'E-mail neověřen'}
+              </span>
+              {!emailVerified && (
+                <button
+                  onClick={handleSendVerify}
+                  className="rounded-md bg-foreground px-3 py-1 text-xs text-background hover:opacity-90 transition"
+                >
+                  Poslat ověřovací e-mail
+                </button>
+              )}
             </div>
-          )}
-        </section>
-      </main>
-    </>
+          </div>
+        </div>
+
+        {/* Vpravo: poslední přihlášení */}
+        {lastSignIn && (
+          <div className="text-sm text-muted-foreground">
+            Poslední přihlášení: {lastSignIn}
+          </div>
+        )}
+      </div>
+
+      {/* Rychlé akce */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button className="rounded-lg border px-3 py-2 hover:bg-muted transition">
+          Upravit profil
+        </button>
+        <button className="rounded-lg border px-3 py-2 hover:bg-muted transition">
+          Změnit heslo
+        </button>
+        <button
+          onClick={handleSignOutEverywhere}
+          className="rounded-lg border px-3 py-2 hover:bg-muted transition"
+        >
+          Odhlásit na všech zařízeních
+        </button>
+      </div>
+    </div>
   );
 }

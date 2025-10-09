@@ -93,7 +93,7 @@ const Header = () => {
   );
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-1000 bg-card border-b border-border elevation-2">
+    <header className="sticky top-0 left-0 right-0 z-1000 bg-card border-b border-border elevation-2">
       <div className="w-full px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}

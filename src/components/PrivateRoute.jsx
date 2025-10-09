@@ -1,13 +1,24 @@
-// PrivateRoute.jsx
+import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function PrivateRoute() {
-  const { user, loading } = useAuth();
+  const { currentUser, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return null; // nebo <Spinner/>, ale NEpřesměrovávat
-  return user
-    ? <Outlet />
-    : <Navigate to="/login" replace state={{ from: location }} />;
+  // Dokud nevíme, jestli je user přihlášen, NIKAM nepřesměrovávat
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-muted-foreground">
+        Načítání…
+      </div>
+    );
+  }
+
+  // Po načtení stavů rozhodni
+  if (!currentUser) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return <Outlet />;
 }

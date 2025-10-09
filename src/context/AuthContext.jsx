@@ -1,47 +1,40 @@
-// AuthContext.jsx
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
-const AuthContext = createContext({ user: null, loading: true });
+const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // <<< důležité
 
   useEffect(() => {
-    // subscribe na změny auth stavu
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
-          const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-          setCurrentUser(userDocSnap.exists()
-            ? { ...user, ...userDocSnap.data() }
-            : user
-          );
+          // volitelně dotáhnout profil z Firestore
+          const ref = doc(db, 'users', user.uid);
+          const snap = await getDoc(ref).catch(() => null);
+          setCurrentUser(snap?.exists() ? { ...user, ...snap.data() } : user);
         } else {
           setCurrentUser(null);
         }
       } finally {
-        setLoading(false);
+        setLoading(false); // <<< nastavujeme až po vyřešení callbacku
       }
     });
 
-    // cleanup při unmountu
     return () => unsubscribe();
-  }, []); // důležité: jen jednou po mountu
+  }, []);
 
-  const value = useMemo(() => ({ user: currentUser, loading }), [currentUser, loading]);
+  const value = { currentUser, loading };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// pohodlný hook
 export function useAuth() {
-  return useContext(AuthContext);
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
+  return ctx;
 }
