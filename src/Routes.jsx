@@ -1,7 +1,5 @@
-import React from 'react';
 import { BrowserRouter, Routes as RouterRoutes, Route } from 'react-router-dom';
-
-import SiteLayout from './layouts/SiteLayout';
+import Header from './components/ui/Header';
 import Eshop from './pages/eshop';
 import ModelUpload from './pages/model-upload';
 import AccountPage from './pages/account';
@@ -14,15 +12,16 @@ import Login from './pages/login';
 import Register from './pages/register';
 import PrinterCatalog from './pages/printer-catalog';
 
+
 export default function Routes() {
   return (
     <BrowserRouter>
-      <RouterRoutes>
+      <Header />
+      <main className="pt-16">
+        <RouterRoutes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* VŠECHNY stránky pod jedním layoutem s Headerem */}
-        <Route element={<SiteLayout />}>
           {/* veřejné */}
           <Route path="/" element={<Eshop />} />
           <Route path="/eshop" element={<Eshop />} />
@@ -39,8 +38,8 @@ export default function Routes() {
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
-        </Route>
-      </RouterRoutes>
+        </RouterRoutes>
+      </main>
     </BrowserRouter>
   );
 }
