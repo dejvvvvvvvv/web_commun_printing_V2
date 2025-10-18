@@ -3,38 +3,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useKiriEngine } from '../../../hooks/useKiriEngine';
 
-// Funkce pro parsování G-kódu a extrakci metadat
 function parseGcode(gcode) {
   if (!gcode) return { time: 0, material: 0, layers: 0 };
 
-  const timeMatch = gcode.match(/; estimated printing time \(normal mode\) = (?:(\d+)h )?(?:(\d+)m )?(\d+)s/);
-  const materialMatch = gcode.match(/; filament used \(mm\) = (\d+\.\d+)/);
-  const layerMatch = gcode.match(/; LAYER_COUNT:(\d+)/);
-  
-  let totalSeconds = 0;
-  if (timeMatch) {
-    totalSeconds += timeMatch[1] ? parseInt(timeMatch[1], 10) * 3600 : 0; // hours
-    totalSeconds += timeMatch[2] ? parseInt(timeMatch[2], 10) * 60 : 0;   // minutes
-    totalSeconds += timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;        // seconds
-  }
+  // Kiri footer po naší úpravě:
+  // ; time=1234.56
+  // ; material=789.01
+  // ; layers=321
 
-  const materialMM = materialMatch ? parseFloat(materialMatch[1]) : 0;
-  
-  // Převod délky filamentu (mm) na hmotnost (g)
-  // hustota PLA = ~1.24 g/cm^3, průměr filamentu 1.75mm
+  const timeMatch = gcode.match(/^[;\s]*time\s*=\s*([\d.]+)/mi);
+  const matMatch  = gcode.match(/^[;\s]*material\s*=\s*([\d.]+)/mi);
+  const layMatch  = gcode.match(/^[;\s]*layers\s*=\s*(\d+)/mi);
+
+  const seconds = timeMatch ? parseFloat(timeMatch[1]) : 0;
+  const materialMM = matMatch ? parseFloat(matMatch[1]) : 0;
+  const layers = layMatch ? parseInt(layMatch[1], 10) : 0;
+
+  // přepočet mm → g (1.75mm filament, PLA ~1.24 g/cm^3)
   const filamentDiameter = 1.75; // mm
-  const filamentRadius = filamentDiameter / 2;
-  const volumeCubicMM = Math.PI * Math.pow(filamentRadius, 2) * materialMM;
-  const volumeCubicCM = volumeCubicMM / 1000;
-  const weightGrams = volumeCubicCM * 1.24;
+  const r = filamentDiameter / 2;
+  const volumeCubicMM = Math.PI * r * r * materialMM;   // mm^3
+  const volumeCubicCM = volumeCubicMM / 1000;           // cm^3
+  const weightGrams = volumeCubicCM * 1.24;             // g
 
-  return {
-    time: totalSeconds, // in seconds
-    material: weightGrams, // in grams
-    layers: layerMatch ? parseInt(layerMatch[1], 10) : 0,
-  };
+  return { time: seconds, material: weightGrams, layers };
 }
-
 
 export default function KiriBackgroundPanel({ fileToSlice, onSliceComplete, device, process }) {
   const { isReady, status, error, sliceFile } = useKiriEngine();

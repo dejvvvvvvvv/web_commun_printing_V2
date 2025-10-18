@@ -21,19 +21,48 @@ export function useKiriEngine() {
         if (canceled) return;
         const eng = new Engine();
 
-        // běž bez renderovacího UI
-        if (eng.setRender) eng.setRender(false);
-
-        // posluchač průběhu (užitečné pro debug / stavový text)
+        // Krok 5: Přidání viditelného debug výstupu listeneru
         eng.setListener?.((msg) => {
+          if (msg?.slice)   console.log('[kiri] slice:', msg.slice);
+          if (msg?.prepare) console.log('[kiri] prepare:', msg.prepare);
+          if (msg?.export)  console.log('[kiri] export:', msg.export);
           if (msg?.slice?.end) setStatus('sliced');
           if (msg?.prepare?.done) setStatus('prepared');
           if (msg?.export?.done) setStatus('exported');
-          // console.debug('kiri:', msg);
         });
+        
+        // běž bez renderovacího UI
+        if (eng.setRender) eng.setRender(false);
 
-        // režim FDM (3D tisk) – pro CNC/laser jsou jiné
+        // Krok 3: Nastavení rozumného FDM process & device
         eng.setMode?.('FDM');
+        
+        // Krok 1: Přimíchej makra do G-code footeru
+        try {
+          const dev = eng.getDevice?.() || {};
+          const gcode = dev.gcode || {};
+          const footer = [
+            '; time={time}',          // v sekundách
+            '; material={material}',  // v mm (délka filamentu)
+            '; layers={layers}'       // počet vrstev
+          ].join('\n');
+          dev.gcode = { ...gcode, post: footer, footer };
+          eng.setDevice?.(dev);
+        } catch (e) {
+          console.warn('Kiri device/footer setup failed:', e);
+        }
+
+        eng.setDevice?.({
+          extruders: 1,
+          bed: { shape: 'rect', x: 220, y: 220, z: 250 },
+          gcode: eng.getDevice?.().gcode, 
+        });
+        eng.setProcess?.({
+          slice: { height: 0.2 },
+          output: { nozzle: 0.4 },
+          firstLayer: { height: 0.2 },
+          device: { filamentDiameter: 1.75, density: 1.24 },
+        });
 
         engineRef.current = eng;
         setReady(true);
